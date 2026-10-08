@@ -31,7 +31,9 @@ Stats Lab is a free, interactive course app for learning the statistics that psy
 
 1. Download [**`akstats-macOS.zip`**](https://github.com/alvina-lai/akstats/releases/latest/download/akstats-macOS.zip) from the [latest release](https://github.com/alvina-lai/akstats/releases/latest) (currently **v1.1**, which adds the practice simulations, search, the Practice data view with downloads, explained code blocks, and right-click bookmarks).
 2. Unzip it and move `akstats.app` to your Applications folder.
-3. The first time you open it, macOS will say it's from an unidentified developer. **Right-click the app → Open → Open**. (Alternatively: System Settings → Privacy & Security → “Open Anyway”.) You only need to do this once.
+3. The first time you open it, macOS will warn that it can't verify the app, because it isn't notarized by Apple (that requires a paid developer account). Close the warning, open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to akstats, then confirm. You only need to do this once.
+
+**Is it safe?** The app is sandboxed: macOS only lets it touch files you choose in a Save dialog, and it never uses the network. All of its source code is in this repository, so you can read it or build the app yourself (Option 2). To confirm your download is the published file, run `shasum -a 256 ~/Downloads/akstats-macOS.zip` in Terminal and compare it with the SHA-256 in the release notes.
 
 Requires **macOS 27** or later.
 
@@ -69,6 +71,8 @@ Every lesson's code runs top to bottom in a fresh Python or R session once the p
 | `.github/workflows/` | A check, on every push, that the scripts match the app, reproduce the bundled data exactly, and run in R |
 
 Lesson content is plain Swift data, so adding or editing a lesson doesn't require touching the interface code.
+
+**Making a release?** Run `tools/release.sh`. It builds `dist/akstats-macOS.zip` with its checksum and release notes, and signs and notarizes the app automatically if a Developer ID certificate is installed (setup steps are at the top of the script).
 
 **Changing a data generator?** Edit it in the lesson, then run `python3 tools/export_scripts.py` and `python3 tools/build_practice_data.py` (with the packages in `tools/requirements.txt`) and commit the results; the GitHub check fails if the scripts and the data drift apart.
 
