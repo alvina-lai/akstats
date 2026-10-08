@@ -2,15 +2,32 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selection: String?
+    @State private var searchText = ""
+    @State private var searchScope = SearchScope.all
+    @State private var jump: JumpRequest?
+    @State private var datasetRequest: String?
+    @State private var referenceQuery = ""
+    @State private var openedFromSearch = false
+
+    private var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300)
+                .searchable(text: $searchText, placement: .sidebar, prompt: "Search lessons, practice, code…")
+                .searchScopes($searchScope) {
+                    ForEach(SearchScope.allCases) { scope in
+                        Text(scope.rawValue).tag(scope)
+                    }
+                }
         } detail: {
             ZStack {
-                if let lesson = Curriculum.lesson(id: selection) {
-                    LessonView(lesson: lesson) { selection = $0.id }
+                if isSearching {
+                    SearchResultsView(query: searchText, scope: searchScope, onOpen: open)
+                        .transition(.opacity)
+                } else if let lesson = Curriculum.lesson(id: selection) {
+                    LessonView(lesson: lesson, jump: jump?.lessonID == lesson.id ? jump : nil) { selection = $0.id }
                         .id(lesson.id)
                         .transition(.asymmetric(
                             insertion: .opacity.combined(with: .offset(y: 16)),
@@ -18,6 +35,13 @@ struct ContentView: View {
                         ))
                 } else if selection == GlossaryView.tag {
                     GlossaryView { selection = $0.id }
+                        .transition(.opacity)
+                } else if selection == ReferencesView.tag {
+                    ReferencesView(initialQuery: referenceQuery)
+                        .id(referenceQuery)
+                        .transition(.opacity)
+                } else if selection == PracticeDataView.tag {
+                    PracticeDataView(openRequest: $datasetRequest)
                         .transition(.opacity)
                 } else {
                     HomeView { selection = $0.id }
@@ -27,6 +51,16 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.background.ignoresSafeArea())
             .animation(.smooth(duration: 0.4), value: selection)
+            .animation(Theme.animation, value: isSearching)
+            .onChange(of: selection) {
+                // Arriving any other way than from search: forget the search's jump and filter.
+                if openedFromSearch {
+                    openedFromSearch = false
+                } else {
+                    jump = nil
+                    referenceQuery = ""
+                }
+            }
             .toolbar {
                 // Global Python/R switch: every code block in the app follows it.
                 ToolbarItem(placement: .primaryAction) {
@@ -40,6 +74,25 @@ struct ContentView: View {
         // Off-white primary text and cool-gray secondary text everywhere, on a dark scheme.
         .foregroundStyle(Theme.textPrimary, Theme.textSecondary, Theme.textSecondary.opacity(0.7))
         .preferredColorScheme(.dark)
+    }
+
+    /// Opens a search result and ends the search.
+    private func open(_ destination: SearchDestination) {
+        let target: String
+        switch destination {
+        case .lesson(let id, let section):
+            jump = section.map { JumpRequest(lessonID: id, section: $0) }
+            target = id
+        case .dataset(let name):
+            datasetRequest = name
+            target = PracticeDataView.tag
+        case .references(let id):
+            referenceQuery = id
+            target = ReferencesView.tag
+        }
+        openedFromSearch = selection != target      // onChange(of: selection) only fires on a change
+        selection = target
+        searchText = ""
     }
 }
 
@@ -56,13 +109,29 @@ struct SidebarView: View {
                     .tag(HomeView.tag)
                 Label { Text("Glossary") } icon: { Image(systemName: "character.book.closed").foregroundStyle(Theme.accent) }
                     .tag(GlossaryView.tag)
+                Label { Text("References") } icon: { Image(systemName: "books.vertical").foregroundStyle(Theme.accent) }
+                    .tag(ReferencesView.tag)
+                Label { Text("Practice data") } icon: { Image(systemName: "tablecells").foregroundStyle(Theme.accent) }
+                    .tag(PracticeDataView.tag)
             }
 
             ForEach(Curriculum.units) { unit in
                 Section {
                     ForEach(unit.lessons) { lesson in
-                        SidebarRow(lesson: lesson, isComplete: progress.isComplete(lesson))
+                        let isBookmarked = progress.bookmark(for: lesson) != nil
+                        SidebarRow(lesson: lesson, isComplete: progress.isComplete(lesson),
+                                   isBookmarked: isBookmarked, simulationCount: lesson.practiceSimulationCount)
                             .tag(lesson.id)
+                            .contextMenu {
+                                if isBookmarked {
+                                    removeBookmarkButton(for: lesson)
+                                }
+                            }
+                            .swipeActions(edge: .trailing) {
+                                if isBookmarked {
+                                    removeBookmarkButton(for: lesson)
+                                }
+                            }
                     }
                 } header: {
                     // Level sits inline after the title (not pinned to the trailing edge),
@@ -87,11 +156,21 @@ struct SidebarView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Stats Lab")
     }
+
+    private func removeBookmarkButton(for lesson: Lesson) -> some View {
+        Button("Remove Bookmark", systemImage: "bookmark.slash") {
+            withAnimation(Theme.animation) { progress.removeBookmark(for: lesson) }
+        }
+    }
 }
 
 private struct SidebarRow: View {
     let lesson: Lesson
     let isComplete: Bool
+    /// The learner bookmarked a spot in this lesson.
+    let isBookmarked: Bool
+    /// How many practice-simulation exercises the lesson has.
+    var simulationCount = 0
 
     private var incompleteSymbol: String {
         lesson.isReview ? "flag.checkered" : "circle"
@@ -119,9 +198,30 @@ private struct SidebarRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
+            if simulationCount > 0 || isBookmarked {
+                Spacer(minLength: 4)
+            }
+            if simulationCount > 0 {
+                HStack(spacing: 2) {
+                    Image(systemName: "flask")
+                    Text("\(simulationCount)")
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Theme.simulation)
+                .help("\(simulationCount) practice-simulation exercise\(simulationCount == 1 ? "" : "s")")
+                .accessibilityHidden(true)
+            }
+            if isBookmarked {
+                Image(systemName: "bookmark.fill")
+                    .font(.caption)
+                    .foregroundStyle(Theme.accent)
+                    .accessibilityHidden(true)
+            }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityValue(isComplete ? "Completed" : "Not completed")
+        .accessibilityValue([isComplete ? "Completed" : "Not completed", isBookmarked ? "Bookmarked" : nil,
+                             simulationCount > 0 ? "\(simulationCount) practice simulation exercises" : nil]
+            .compactMap { $0 }.joined(separator: ", "))
     }
 }
 
@@ -133,6 +233,7 @@ struct HomeView: View {
     var onSelect: (Lesson) -> Void
 
     @Environment(ProgressStore.self) private var progress
+    @State private var isConfirmingClear = false
 
     private var overall: Double { progress.fraction(of: Curriculum.allLessons) }
 
@@ -142,6 +243,11 @@ struct HomeView: View {
                 hero
                 continueCard
                 preferences
+                if !progress.bookmarks.isEmpty {
+                    bookmarksRow
+                        .transition(.opacity)
+                }
+                simulationsCard
 
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Course map")
@@ -235,6 +341,74 @@ struct HomeView: View {
             }
             Spacer()
             LanguageSwitch()
+        }
+    }
+
+    /// Where the practice-simulation exercises are, lesson by lesson.
+    private var simulationsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Label("Practice simulations", systemImage: "flask")
+                    .font(.headline)
+                    .foregroundStyle(Theme.simulation)
+                Spacer()
+                Text("\(Curriculum.lessonsWithSimulations.map(\.practiceSimulationCount).reduce(0, +)) exercises in \(Curriculum.lessonsWithSimulations.count) lessons")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text("Two simulated studies — political parasocial attachment, and how people ask chatbots about court cases — whose data recur in exercises across the course. Get the data from *Practice data*, then try the exercises in any order.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 8)], alignment: .leading, spacing: 8) {
+                ForEach(Curriculum.lessonsWithSimulations) { lesson in
+                    Button { onSelect(lesson) } label: {
+                        HStack(spacing: 8) {
+                            Text(lesson.title)
+                                .font(.callout)
+                                .lineLimit(1)
+                            Spacer(minLength: 4)
+                            Text("\(lesson.practiceSimulationCount)")
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(Theme.simulation)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Theme.simulation.opacity(0.08), in: .rect(cornerRadius: 8, style: .continuous))
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                    .hoverHighlight(tint: Theme.simulation)
+                    .accessibilityLabel("\(lesson.title), \(lesson.practiceSimulationCount) practice-simulation exercises")
+                }
+            }
+        }
+        .card(padding: 20)
+    }
+
+    private var bookmarksRow: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Bookmarks")
+                    .font(.headline)
+                Text(progress.bookmarks.count == 1
+                     ? "1 lesson is bookmarked."
+                     : "\(progress.bookmarks.count) lessons are bookmarked.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+            }
+            Spacer()
+            Button("Clear All", systemImage: "bookmark.slash", role: .destructive) {
+                isConfirmingClear = true
+            }
+            .confirmationDialog("Clear all bookmarks?", isPresented: $isConfirmingClear) {
+                Button("Clear All Bookmarks", role: .destructive) {
+                    withAnimation(Theme.animation) { progress.clearAllBookmarks() }
+                }
+            } message: {
+                Text("Your completed lessons aren't affected.")
+            }
         }
     }
 }

@@ -35,6 +35,7 @@ extension Curriculum {
         .merging(extraPracticeCore) { $0 + $1 }
         .merging(extraPracticeResearch) { $0 + $1 }
         .merging(extraPracticeStructure) { $0 + $1 }
+        .merging(simulationPractice) { $0 + $1 }   // practice-simulation exercises come last
 
     // MARK: Units 0–2
 
@@ -71,9 +72,15 @@ extension Curriculum {
             practice("Translate a line",
                      "Translate this Python into R: `df[df[\"age\"] > 30][\"anxiety\"].mean()`",
                      python: #"""
+                     import pandas as pd
+                     df = pd.read_csv("survey.csv")
+
                      df[df["age"] > 30]["anxiety"].mean()
                      """#,
                      r: #"""
+                     library(tidyverse)
+                     df <- read_csv("survey.csv")
+
                      df |> filter(age > 30) |> summarise(mean_anxiety = mean(anxiety))
                      # or, in base R:
                      mean(df$anxiety[df$age > 30])
@@ -222,12 +229,18 @@ extension Curriculum {
             practice("Make an ordered factor",
                      "Convert `education` (1–5) into an ordered category with labels HS, Some college, BA, MA, Graduate.",
                      python: #"""
+                     import pandas as pd
+                     df = pd.read_csv("survey.csv")
+
                      labels = ["HS", "Some college", "BA", "MA", "Graduate"]
                      df["education_f"] = pd.Categorical(df["education"].map(dict(zip(range(1, 6), labels))),
                                                         categories=labels, ordered=True)
                      print(df["education_f"].value_counts(sort=False))
                      """#,
                      r: #"""
+                     library(tidyverse)
+                     df <- read_csv("survey.csv")
+
                      df <- df |>
                        mutate(education_f = factor(education, levels = 1:5,
                                                    labels = c("HS", "Some college", "BA", "MA", "Graduate"),
@@ -297,11 +310,17 @@ extension Curriculum {
             practice("Describe a variable fully",
                      "Report n, mean, median, SD, and IQR of `rumination` for each `region`.",
                      python: #"""
+                     import pandas as pd
+                     survey = pd.read_csv("survey.csv")
+
                      survey.groupby("region")["rumination"].agg(
                          n="count", mean="mean", median="median", sd="std",
                          iqr=lambda x: x.quantile(0.75) - x.quantile(0.25)).round(2)
                      """#,
                      r: #"""
+                     library(tidyverse)
+                     survey <- read_csv("survey.csv")
+
                      survey |>
                        group_by(region) |>
                        summarise(n = n(), mean = mean(rumination), median = median(rumination),
@@ -313,12 +332,18 @@ extension Curriculum {
             practice("Histograms by group",
                      "Plot overlaid histograms of `anxiety` for each `region`.",
                      python: #"""
+                     import pandas as pd
+                     survey = pd.read_csv("survey.csv")
+
                      import seaborn as sns
                      import matplotlib.pyplot as plt
                      sns.histplot(data=survey, x="anxiety", hue="region", element="step", stat="density", common_norm=False)
                      plt.show()
                      """#,
                      r: #"""
+                     library(tidyverse)
+                     survey <- read_csv("survey.csv")
+
                      ggplot(survey, aes(anxiety, fill = region)) +
                        geom_histogram(alpha = 0.5, position = "identity", bins = 25) +
                        theme_classic()
@@ -327,11 +352,18 @@ extension Curriculum {
             practice("Boxplots with points",
                      "Draw boxplots of `rumination` by `education` with jittered points.",
                      python: #"""
+                     import pandas as pd
+                     import seaborn as sns
+                     import matplotlib.pyplot as plt
+                     survey = pd.read_csv("survey.csv")
                      sns.boxplot(data=survey, x="education", y="rumination", color="white", showfliers=False)
                      sns.stripplot(data=survey, x="education", y="rumination", alpha=0.3, color="0.4")
                      plt.show()
                      """#,
                      r: #"""
+                     library(tidyverse)
+                     survey <- read_csv("survey.csv")
+
                      ggplot(survey, aes(factor(education), rumination)) +
                        geom_boxplot(outlier.shape = NA) +
                        geom_jitter(width = 0.15, alpha = 0.3) +
@@ -343,10 +375,15 @@ extension Curriculum {
             practice("Flag extreme values",
                      "Compute z-scores for `anxiety`. How many participants have |z| > 3?",
                      python: #"""
+                     import pandas as pd
+                     survey = pd.read_csv("survey.csv")
+
                      z = (survey["anxiety"] - survey["anxiety"].mean()) / survey["anxiety"].std()
                      print((z.abs() > 3).sum())
                      """#,
                      r: #"""
+                     survey <- read.csv("survey.csv")
+
                      z <- as.numeric(scale(survey$anxiety))
                      sum(abs(z) > 3)
                      """#,
@@ -397,10 +434,16 @@ extension Curriculum {
             practice("Sample size and width",
                      "Compute 95% CIs for mean anxiety in the full sample and among rural respondents only. Which is wider, and why?",
                      python: #"""
+                     import pandas as pd
+                     from scipy import stats
+                     survey = pd.read_csv("survey.csv")
+
                      for name, x in [("all", survey["anxiety"]), ("rural", survey.loc[survey["region"] == "rural", "anxiety"])]:
                          print(name, stats.t.interval(0.95, df=len(x) - 1, loc=x.mean(), scale=stats.sem(x)))
                      """#,
                      r: #"""
+                     survey <- read.csv("survey.csv")
+
                      t.test(survey$anxiety)$conf.int
                      t.test(survey$anxiety[survey$region == "rural"])$conf.int
                      """#,
@@ -410,6 +453,9 @@ extension Curriculum {
             practice("p-values when nothing is going on",
                      "Simulate 10,000 t-tests comparing two groups drawn from the same population. What share have p < .05? What does the histogram of p-values look like?",
                      python: #"""
+                     import numpy as np
+                     from scipy import stats
+
                      rng = np.random.default_rng(5)
                      p = np.array([stats.ttest_ind(rng.normal(size=20), rng.normal(size=20)).pvalue for _ in range(10_000)])
                      print((p < 0.05).mean())
@@ -505,11 +551,16 @@ extension Curriculum {
             practice("Was randomization independent of school?",
                      "Test whether `method` and `school` are associated in classroom.csv.",
                      python: #"""
+                     import pandas as pd
+                     classroom = pd.read_csv("classroom.csv")
+
                      from scipy import stats
                      table = pd.crosstab(classroom["method"], classroom["school"])
                      print(table, stats.chi2_contingency(table)[:2])
                      """#,
                      r: #"""
+                     classroom <- read.csv("classroom.csv")
+
                      chisq.test(table(classroom$method, classroom$school))
                      """#,
                      answer: "Not significant — methods were assigned independently of school. (Some expected counts are near 10–15, so the χ² approximation is fine.)"),
@@ -532,12 +583,17 @@ extension Curriculum {
             practice("An ordinal item by group",
                      "Compare the single item `mind_1` between urban and rural respondents with a Mann–Whitney test.",
                      python: #"""
+                     import pandas as pd
+                     survey = pd.read_csv("survey.csv")
+
                      from scipy import stats
                      d = survey.dropna(subset=["mind_1"])
                      print(stats.mannwhitneyu(d.loc[d["region"] == "rural", "mind_1"],
                                               d.loc[d["region"] == "urban", "mind_1"]))
                      """#,
                      r: #"""
+                     survey <- read.csv("survey.csv")
+
                      wilcox.test(mind_1 ~ region, data = survey)
                      """#,
                      answer: "No meaningful difference — region wasn't built into mindfulness. A single 1–5 item is ordinal, which is why a rank test suits it."),
@@ -652,6 +708,9 @@ extension Curriculum {
             practice("Random slopes for daily work hours",
                      "In diary.csv, person-mean-center `work_hours` and fit `wellbeing ~ hours_within + (1 + hours_within | participant)`. Do the within-person slopes vary across people?",
                      python: #"""
+                     import pandas as pd
+                     diary = pd.read_csv("diary.csv")
+
                      import statsmodels.formula.api as smf
                      diary["hours_within"] = diary["work_hours"] - diary.groupby("participant")["work_hours"].transform("mean")
                      m = smf.mixedlm("wellbeing ~ hours_within", data=diary, groups=diary["participant"],
@@ -659,6 +718,9 @@ extension Curriculum {
                      print(m.summary())
                      """#,
                      r: #"""
+                     library(tidyverse)
+                     diary <- read_csv("diary.csv")
+
                      library(lmerTest)
                      diary <- diary |> group_by(participant) |>
                        mutate(hours_within = work_hours - mean(work_hours)) |> ungroup()
@@ -670,11 +732,18 @@ extension Curriculum {
             practice("How clustered is daily wellbeing?",
                      "Compute the ICC of `wellbeing` for `participant` with a random-intercept model.",
                      python: #"""
+                     import pandas as pd
+                     import statsmodels.formula.api as smf
+                     diary = pd.read_csv("diary.csv")
+
                      fit = smf.mixedlm("wellbeing ~ 1", data=diary, groups=diary["participant"]).fit()
                      between = fit.cov_re.iloc[0, 0]
                      print(between / (between + fit.scale))
                      """#,
                      r: #"""
+                     library(lme4)
+                     diary <- read.csv("diary.csv")
+
                      vc <- as.data.frame(VarCorr(lmer(wellbeing ~ 1 + (1 | participant), data = diary)))
                      vc$vcov[1] / sum(vc$vcov)
                      """#,
@@ -682,13 +751,15 @@ extension Curriculum {
             practice("Clustered course evaluations",
                      "In OpenIntro's `evals`, most professors taught several courses, so rows aren't independent. Refit `score ~ bty_avg` as a mixed model with a random intercept for `prof_id`. How does the standard error of the slope change?",
                      python: #"""
-                     evals = pd.read_csv("https://www.openintro.org/data/csv/evals.csv")
+                     # openintro.org rejects Python's default user agent, so send a simple one
+                     evals = pd.read_csv("https://www.openintro.org/data/csv/evals.csv", storage_options={"User-Agent": "pandas"})
                      ols = smf.ols("score ~ bty_avg", data=evals).fit()
                      mm = smf.mixedlm("score ~ bty_avg", data=evals, groups=evals["prof_id"]).fit()
                      print("OLS SE:", ols.bse["bty_avg"], " mixed-model SE:", mm.bse["bty_avg"])
                      """#,
                      r: #"""
                      library(openintro)
+                     library(lmerTest)
                      summary(lm(score ~ bty_avg, data = evals))$coefficients["bty_avg", ]
                      summary(lmer(score ~ bty_avg + (1 | prof_id), data = evals))$coefficients["bty_avg", ]
                      """#,
@@ -698,6 +769,9 @@ extension Curriculum {
             practice("One factor or two?",
                      "Run an EFA with one factor on the reverse-keyed mindfulness items. Then run it on the raw items. Compare the loadings of items 3 and 5.",
                      python: #"""
+                     import pandas as pd
+                     survey = pd.read_csv("survey.csv")
+
                      from factor_analyzer import FactorAnalyzer
                      items = [f"mind_{i}" for i in range(1, 7)]
                      keyed = survey[items].copy()
@@ -707,6 +781,9 @@ extension Curriculum {
                          print(fa.loadings_.round(2).ravel())
                      """#,
                      r: #"""
+                     library(tidyverse)
+                     survey <- read_csv("survey.csv")
+
                      keyed <- survey |> select(mind_1:mind_6) |> mutate(across(c(mind_3, mind_5), ~ 6 - .x))
                      psych::fa(keyed, nfactors = 1)$loadings
                      psych::fa(select(survey, mind_1:mind_6), nfactors = 1)$loadings
@@ -715,6 +792,9 @@ extension Curriculum {
             practice("How many factors?",
                      "Run a parallel analysis on the keyed items. How many factors does it suggest?",
                      r: #"""
+                     library(tidyverse)
+                     keyed <- read_csv("survey.csv") |> select(mind_1:mind_6) |> mutate(across(c(mind_3, mind_5), ~ 6 - .x))
+
                      psych::fa.parallel(keyed, fa = "fa")
                      """#,
                      answer: "One factor — the items were generated from a single latent trait."),
@@ -802,6 +882,10 @@ extension Curriculum {
             practice("Find the Johnson–Neyman boundary",
                      "Find the mindfulness value at which the social media slope stops being significant.",
                      python: #"""
+                     import numpy as np
+                     from scipy import stats
+                     b = model.params
+
                      V = model.cov_params()
                      ws = np.linspace(survey["mind_c"].min(), survey["mind_c"].max(), 200)
                      slope = b["sm_c"] + b["sm_c:mind_c"] * ws

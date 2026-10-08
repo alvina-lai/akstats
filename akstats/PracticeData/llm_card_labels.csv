@@ -1,0 +1,227 @@
+query_id,card_label
+P001_C1_Q01,what will happen next
+P001_C1_Q02,why or how it happened
+P001_C1_Q03,what will happen next
+P001_C1_Q04,whether it was fair
+P001_C1_Q05,what the AI thinks
+P002_C1_Q01,why or how it happened
+P002_C1_Q02,what will happen next
+P002_C1_Q03,what someone should do
+P003_C1_Q01,what the AI thinks
+P003_C1_Q02,none of these
+P003_C1_Q03,none of these
+P004_C1_Q01,why or how it happened
+P004_C1_Q02,none of these
+P004_C1_Q03,what happened
+P004_C1_Q03b,what happened
+P004_C1_Q04,none of these
+P004_C1_Q05,what will happen next
+P004_C1_Q06,what happened
+P004_C1_Q07,what will happen next
+P004_C1_Q07b,what will happen next
+P004_C1_Q08,what will happen next
+P005_C1_Q01,whether it was fair
+P005_C1_Q02,none of these
+P005_C1_Q03,what the AI thinks
+P005_C1_Q04,what the AI thinks
+P005_C1_Q05,what happened
+P005_C1_Q06,why or how it happened
+P005_C1_Q07,what the AI thinks
+P005_C1_Q08,none of these
+P005_C1_Q09,what someone should do
+P005_C1_Q10,what happened
+P005_C1_Q11,whether it was fair
+P006_C1_Q01,why or how it happened
+P006_C1_Q01b,why or how it happened
+P006_C1_Q02,what will happen next
+P006_C1_Q03,what happened
+P006_C1_Q04,why or how it happened
+P006_C1_Q05,whether it was fair
+P006_C1_Q06,whether it was fair
+P007_C1_Q01,why or how it happened
+P007_C1_Q02,why or how it happened
+P007_C1_Q03,why or how it happened
+P007_C2_Q01,what the AI thinks
+P007_C2_Q02,none of these
+P007_C2_Q03,what happened
+P007_C2_Q04,what will happen next
+P007_C2_Q05,whether it was fair
+P007_C2_Q06,what will happen next
+P008_C1_Q01,what happened
+P008_C1_Q02,none of these
+P008_C1_Q03,why or how it happened
+P008_C2_Q01,why or how it happened
+P008_C2_Q02,whether it was fair
+P009_C1_Q01,what someone should do
+P009_C1_Q02,what happened
+P009_C1_Q03,whether it was fair
+P009_C1_Q04,what the AI thinks
+P010_C1_Q01,what will happen next
+P010_C1_Q02,none of these
+P010_C1_Q03,whether it was fair
+P010_C1_Q04,what the AI thinks
+P011_C1_Q01,why or how it happened
+P011_C1_Q02,what the AI thinks
+P011_C1_Q03,what will happen next
+P011_C1_Q04,why or how it happened
+P011_C1_Q05,what the AI thinks
+P011_C1_Q06,why or how it happened
+P011_C1_Q06b,none of these
+P011_C1_Q07,what will happen next
+P012_C1_Q01,whether it was fair
+P012_C1_Q02,what happened
+P012_C1_Q03,none of these
+P012_C1_Q04,why or how it happened
+P012_C1_Q04b,why or how it happened
+P012_C1_Q05,why or how it happened
+P012_C1_Q06,what someone should do
+P012_C1_Q07,what happened
+P012_C1_Q08,none of these
+P012_C1_Q09,whether it was fair
+P012_C1_Q10,none of these
+P012_C1_Q11,what will happen next
+P013_C1_Q01,why or how it happened
+P013_C1_Q02,what happened
+P013_C1_Q02b,what happened
+P013_C1_Q03,why or how it happened
+P013_C1_Q03b,why or how it happened
+P013_C1_Q04,whether it was fair
+P013_C1_Q05,whether it was fair
+P013_C1_Q06,why or how it happened
+P013_C1_Q07,whether it was fair
+P014_C1_Q01,what someone should do
+P014_C1_Q02,none of these
+P014_C1_Q03,why or how it happened
+P014_C1_Q04,what someone should do
+P014_C1_Q05,what the AI thinks
+P014_C1_Q06,what happened
+P014_C1_Q07,none of these
+P014_C1_Q08,what the AI thinks
+P014_C1_Q09,whether it was fair
+P014_C1_Q10,none of these
+P015_C1_Q01,what happened
+P015_C1_Q02,why or how it happened
+P015_C1_Q03,what happened
+P015_C1_Q04,none of these
+P015_C1_Q05,what the AI thinks
+P015_C1_Q06,why or how it happened
+P015_C1_Q07,why or how it happened
+P015_C1_Q08,none of these
+P015_C1_Q09,none of these
+P015_C1_Q10,what the AI thinks
+P015_C1_Q10b,what the AI thinks
+P015_C1_Q11,what someone should do
+P016_C1_Q01,what happened
+P016_C1_Q02,why or how it happened
+P016_C1_Q03,none of these
+P016_C1_Q04,none of these
+P017_C1_Q01,what someone should do
+P017_C1_Q01b,what someone should do
+P017_C1_Q02,what happened
+P017_C1_Q03,what the AI thinks
+P017_C2_Q01,none of these
+P017_C2_Q02,what the AI thinks
+P017_C2_Q03,whether it was fair
+P017_C2_Q04,none of these
+P018_C1_Q01,what happened
+P018_C1_Q02,what happened
+P018_C1_Q03,why or how it happened
+P018_C1_Q04,why or how it happened
+P018_C1_Q05,why or how it happened
+P018_C1_Q05b,why or how it happened
+P018_C1_Q06,none of these
+P018_C1_Q06b,whether it was fair
+P018_C1_Q07,whether it was fair
+P019_C1_Q01,why or how it happened
+P019_C1_Q02,why or how it happened
+P019_C1_Q03,what will happen next
+P019_C1_Q04,what will happen next
+P019_C1_Q05,whether it was fair
+P019_C1_Q06,none of these
+P020_C1_Q01,whether it was fair
+P020_C1_Q02,what happened
+P020_C1_Q03,what happened
+P020_C1_Q04,none of these
+P020_C1_Q05,none of these
+P020_C1_Q06,what the AI thinks
+P020_C1_Q07,what someone should do
+P021_C1_Q01,what will happen next
+P021_C1_Q02,why or how it happened
+P021_C1_Q03,what will happen next
+P021_C1_Q04,what happened
+P021_C1_Q05,whether it was fair
+P022_C1_Q01,what happened
+P022_C1_Q02,whether it was fair
+P022_C1_Q03,whether it was fair
+P022_C1_Q04,what happened
+P022_C1_Q05,what will happen next
+P022_C1_Q06,why or how it happened
+P022_C1_Q07,what someone should do
+P022_C1_Q08,whether it was fair
+P022_C1_Q09,what the AI thinks
+P023_C1_Q01,what happened
+P023_C1_Q02,what someone should do
+P023_C1_Q03,what happened
+P023_C1_Q04,none of these
+P023_C1_Q05,what happened
+P023_C1_Q06,none of these
+P023_C1_Q07,what happened
+P023_C1_Q08,none of these
+P023_C1_Q09,what happened
+P023_C1_Q10,what happened
+P023_C1_Q11,none of these
+P024_C1_Q01,what will happen next
+P024_C1_Q02,whether it was fair
+P024_C1_Q03,what someone should do
+P024_C1_Q04,what the AI thinks
+P025_C1_Q01,why or how it happened
+P025_C1_Q02,none of these
+P025_C1_Q03,whether it was fair
+P025_C1_Q04,whether it was fair
+P025_C1_Q05,what happened
+P025_C1_Q06,whether it was fair
+P025_C1_Q07,what will happen next
+P025_C1_Q08,whether it was fair
+P026_C1_Q01,what happened
+P026_C1_Q02,none of these
+P026_C1_Q03,what happened
+P026_C1_Q04,none of these
+P026_C1_Q05,none of these
+P027_C1_Q01,why or how it happened
+P027_C1_Q02,what the AI thinks
+P027_C1_Q02b,what happened
+P027_C1_Q03,what will happen next
+P027_C1_Q04,what someone should do
+P028_C1_Q01,why or how it happened
+P028_C1_Q02,what the AI thinks
+P028_C1_Q03,what someone should do
+P028_C1_Q04,whether it was fair
+P028_C1_Q05,what someone should do
+P028_C1_Q05b,whether it was fair
+P028_C1_Q06,what someone should do
+P029_C1_Q01,what happened
+P029_C1_Q02,none of these
+P029_C1_Q03,what happened
+P029_C1_Q04,what the AI thinks
+P029_C2_Q01,what the AI thinks
+P029_C2_Q02,what someone should do
+P030_C1_Q01,why or how it happened
+P030_C1_Q01b,why or how it happened
+P030_C1_Q02,whether it was fair
+P030_C1_Q03,what happened
+P030_C1_Q03b,none of these
+P030_C1_Q04,why or how it happened
+P030_C1_Q04b,why or how it happened
+P030_C1_Q05,what happened
+P030_C1_Q06,none of these
+P030_C1_Q07,what will happen next
+P030_C1_Q08,what someone should do
+P030_C1_Q09,whether it was fair
+P031_C1_Q01,what happened
+P031_C1_Q02,why or how it happened
+P031_C1_Q03,what happened
+P031_C1_Q04,none of these
+P032_C1_Q01,none of these
+P032_C1_Q02,what the AI thinks
+P032_C1_Q03,whether it was fair
+P032_C1_Q04,none of these

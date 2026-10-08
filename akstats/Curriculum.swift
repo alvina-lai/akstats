@@ -16,7 +16,7 @@ enum Curriculum {
         // Intermediate
         inference, comparing, relationships, visualizingStats,
         // Advanced
-        advanced, moderationMediation, categoricalOutcomes, latentModels, textAsData,
+        advanced, moderationMediation, categoricalOutcomes, latentModels, textAsData, realWorld,
         capstoneReview,
     ]
 
@@ -201,7 +201,8 @@ extension Curriculum {
                 r: #"""
                 # Run once:
                 install.packages(c("tidyverse", "lme4", "lmerTest", "afex",
-                                   "emmeans", "psych", "effectsize", "pwr", "car"))
+                                   "emmeans", "psych", "effectsize", "pwr", "car"),
+                                 repos = "https://cloud.r-project.org")
 
                 library(tidyverse)
                 library(lme4)
@@ -212,11 +213,13 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "The same regression, written both ways",
                 python: #"""
-                model = smf.ols("wellbeing ~ income + age", data=df).fit()
+                survey = pd.read_csv("survey.csv")
+                model = smf.ols("anxiety ~ rumination + age", data=survey).fit()
                 print(model.summary())
                 """#,
                 r: #"""
-                model <- lm(wellbeing ~ income + age, data = df)
+                survey <- read_csv("survey.csv")
+                model <- lm(anxiety ~ rumination + age, data = survey)
                 summary(model)
                 """#
             )),
@@ -244,6 +247,8 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Read, apply exclusions, and reshape Stroop data from wide to long",
                 python: #"""
+                import pandas as pd
+
                 df = pd.read_csv("stroop.csv")
 
                 # Keep adults who passed the attention check
@@ -259,6 +264,8 @@ extension Curriculum {
                 long["condition"] = long["condition"].str.replace("rt_", "")
                 """#,
                 r: #"""
+                library(tidyverse)
+
                 df <- read_csv("stroop.csv") |>
                   filter(age >= 18, attention_check == "pass")
 
@@ -329,6 +336,16 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Descriptive statistics, overall and by condition",
                 python: #"""
+                import numpy as np
+                import pandas as pd
+
+                # The Stroop data in long format, as built in *Loading & tidying data*
+                long = (pd.read_csv("stroop.csv")
+                          .query("age >= 18 and attention_check == 'pass'")
+                          .melt(id_vars="participant", value_vars=["rt_congruent", "rt_incongruent"],
+                                var_name="condition", value_name="rt"))
+                long["condition"] = long["condition"].str.replace("rt_", "")
+
                 rt = long["rt"]
                 print(rt.mean(), rt.median(), rt.std())   # pandas .std() uses n − 1
                 print(rt.quantile([0.25, 0.75]))
@@ -336,6 +353,14 @@ extension Curriculum {
                 long.groupby("condition")["rt"].agg(["count", "mean", "median", "std"])
                 """#,
                 r: #"""
+                library(tidyverse)
+
+                # The Stroop data in long format, as built in *Loading & tidying data*
+                long <- read_csv("stroop.csv") |>
+                  filter(age >= 18, attention_check == "pass") |>
+                  pivot_longer(c(rt_congruent, rt_incongruent), names_to = "condition",
+                               names_prefix = "rt_", values_to = "rt")
+
                 long |>
                   group_by(condition) |>
                   summarise(
@@ -386,6 +411,16 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Histograms and boxplots with raw data points",
                 python: #"""
+                import numpy as np
+                import pandas as pd
+
+                # The Stroop data in long format, as built in *Loading & tidying data*
+                long = (pd.read_csv("stroop.csv")
+                          .query("age >= 18 and attention_check == 'pass'")
+                          .melt(id_vars="participant", value_vars=["rt_congruent", "rt_incongruent"],
+                                var_name="condition", value_name="rt"))
+                long["condition"] = long["condition"].str.replace("rt_", "")
+
                 import seaborn as sns
                 import matplotlib.pyplot as plt
 
@@ -398,6 +433,14 @@ extension Curriculum {
                 plt.show()
                 """#,
                 r: #"""
+                library(tidyverse)
+
+                # The Stroop data in long format, as built in *Loading & tidying data*
+                long <- read_csv("stroop.csv") |>
+                  filter(age >= 18, attention_check == "pass") |>
+                  pivot_longer(c(rt_congruent, rt_incongruent), names_to = "condition",
+                               names_prefix = "rt_", values_to = "rt")
+
                 ggplot(long, aes(x = rt, fill = condition)) +
                   geom_histogram(alpha = 0.6, position = "identity", bins = 30)
 
@@ -442,7 +485,7 @@ extension Curriculum {
                     "**No hard boundaries close to the bulk of the data** (e.g. reaction times near 0, ratings piled at a scale end).",
                     "Skewed variables can often be made closer to normal with a log or square-root transformation.",
                 ],
-                reading: "OpenIntro Statistics (4th ed.), §4.1 (the normal distribution) and §2.1.5 (transforming data)."
+                reading: "OpenIntro Statistics (4th ed.), §4.1 (the normal distribution) and §2.1.7 (transforming data)."
             )),
             .chart(ChartExample(
                 title: "The 68–95–99.7 rule",
@@ -468,6 +511,16 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Standardize, check normality visually, and log-transform",
                 python: #"""
+                import numpy as np
+                import pandas as pd
+
+                # The Stroop data in long format, as built in *Loading & tidying data*
+                long = (pd.read_csv("stroop.csv")
+                          .query("age >= 18 and attention_check == 'pass'")
+                          .melt(id_vars="participant", value_vars=["rt_congruent", "rt_incongruent"],
+                                var_name="condition", value_name="rt"))
+                long["condition"] = long["condition"].str.replace("rt_", "")
+
                 from scipy import stats
                 import matplotlib.pyplot as plt
 
@@ -481,6 +534,14 @@ extension Curriculum {
                 long["log_rt"] = np.log(long["rt"])
                 """#,
                 r: #"""
+                library(tidyverse)
+
+                # The Stroop data in long format, as built in *Loading & tidying data*
+                long <- read_csv("stroop.csv") |>
+                  filter(age >= 18, attention_check == "pass") |>
+                  pivot_longer(c(rt_congruent, rt_incongruent), names_to = "condition",
+                               names_prefix = "rt_", values_to = "rt")
+
                 long <- long |>
                   mutate(rt_z   = as.numeric(scale(rt)),
                          log_rt = log(rt))
@@ -516,9 +577,9 @@ extension Curriculum {
 extension Curriculum {
     static let inference = Unit(
         id: "inference", number: 3, title: "From sample to population", level: .intermediate,
-        summary: "Uncertainty, p-values, effect sizes, and power.",
+        summary: "Probability, uncertainty, p-values, effect sizes, and power.",
         symbol: "scope",
-        lessons: [standardError, hypothesisTesting, bootstrapLesson, effectSizes, samplePlanning]
+        lessons: [probability, standardError, hypothesisTesting, bootstrapLesson, effectSizes, samplePlanning]
     )
 
     static let standardError = Lesson(
@@ -559,6 +620,18 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Simulate the sampling distribution, then compute a 95% CI",
                 python: #"""
+                import numpy as np
+                import pandas as pd
+
+                # The Stroop data in long format, as built in *Loading & tidying data*
+                long = (pd.read_csv("stroop.csv")
+                          .query("age >= 18 and attention_check == 'pass'")
+                          .melt(id_vars="participant", value_vars=["rt_congruent", "rt_incongruent"],
+                                var_name="condition", value_name="rt"))
+                long["condition"] = long["condition"].str.replace("rt_", "")
+
+                from scipy import stats
+
                 rng = np.random.default_rng(42)
 
                 # 1,000 studies with n = 30 from a population with M = 100, SD = 15
@@ -571,6 +644,14 @@ extension Curriculum {
                                       loc=x.mean(), scale=stats.sem(x))
                 """#,
                 r: #"""
+                library(tidyverse)
+
+                # The Stroop data in long format, as built in *Loading & tidying data*
+                long <- read_csv("stroop.csv") |>
+                  filter(age >= 18, attention_check == "pass") |>
+                  pivot_longer(c(rt_congruent, rt_incongruent), names_to = "condition",
+                               names_prefix = "rt_", values_to = "rt")
+
                 set.seed(42)
 
                 # 1,000 studies with n = 30 from a population with M = 100, SD = 15
@@ -617,7 +698,7 @@ extension Curriculum {
                     "**One planned test** — or a correction when running many.",
                     "A **one-sided** alternative only when the direction was specified before seeing the data.",
                 ],
-                reading: "OpenIntro Statistics (4th ed.), §5.3 (hypothesis testing) and §2.3 (randomization tests)."
+                reading: "OpenIntro Statistics (4th ed.), §5.3 (hypothesis testing) and §2.3 (case study: simulating a randomization test)."
             )),
             .chart(ChartExample(
                 title: "Reading a p-value off a null distribution",
@@ -640,8 +721,13 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Build a p-value from scratch with a permutation test",
                 python: #"""
-                treat = df.loc[df["group"] == "treatment", "score"].to_numpy()
-                ctrl  = df.loc[df["group"] == "control", "score"].to_numpy()
+                import numpy as np
+                import pandas as pd
+
+                # Post-test scores: active learning vs. lecture (classroom.csv)
+                classroom = pd.read_csv("classroom.csv")
+                treat = classroom.loc[classroom["method"] == "active", "posttest"].to_numpy()
+                ctrl  = classroom.loc[classroom["method"] == "lecture", "posttest"].to_numpy()
                 observed = treat.mean() - ctrl.mean()
 
                 pooled = np.concatenate([treat, ctrl])
@@ -655,17 +741,22 @@ extension Curriculum {
                 print(f"difference = {observed:.2f}, p = {p:.4f}")
                 """#,
                 r: #"""
+                # Post-test scores: active learning vs. lecture (classroom.csv)
+                classroom <- read.csv("classroom.csv")
+                df <- subset(classroom, method %in% c("active", "lecture"))
+
                 set.seed(1)
-                observed <- with(df, mean(score[group == "treatment"]) -
-                                     mean(score[group == "control"]))
+                observed <- with(df, mean(posttest[method == "active"]) -
+                                     mean(posttest[method == "lecture"]))
 
                 diffs <- replicate(10000, {
-                  shuffled <- sample(df$group)
-                  mean(df$score[shuffled == "treatment"]) -
-                    mean(df$score[shuffled == "control"])
+                  shuffled <- sample(df$method)
+                  mean(df$posttest[shuffled == "active"]) -
+                    mean(df$posttest[shuffled == "lecture"])
                 })
 
                 p <- mean(abs(diffs) >= abs(observed))
+                c(difference = observed, p = p)
                 """#
             )),
             .caution("What p is NOT", "• Not the probability that H₀ is true.\n• Not the probability your result is “due to chance”.\n• *p* > .05 does **not** show there's no effect.\n• *p* says nothing about how large or important an effect is."),
@@ -727,7 +818,7 @@ extension Curriculum {
                 ]
             )),
             .terms([
-                Term("Cohen's d", "Mean difference in SD units. Rough benchmarks: 0.2 small, 0.5 medium, 0.8 large."),
+                Term("Cohen's d", "Mean difference in SD units. Cohen's (1988) rough benchmarks: 0.2 small, 0.5 medium, 0.8 large."),
                 Term("r", "Correlation coefficient, also used as an effect size."),
                 Term("η²ₚ (partial eta squared)", "Proportion of variance explained by a factor in ANOVA."),
                 Term("Odds ratio (OR)", "Effect size for binary outcomes."),
@@ -736,10 +827,16 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Compute Cohen's d and plan your sample size",
                 python: #"""
+                import numpy as np
+                import pandas as pd
                 import pingouin as pg
                 from statsmodels.stats.power import TTestIndPower
 
+                classroom = pd.read_csv("classroom.csv")
+                treat = classroom.loc[classroom["method"] == "active", "posttest"]
+                ctrl = classroom.loc[classroom["method"] == "lecture", "posttest"]
                 d = pg.compute_effsize(treat, ctrl, eftype="cohen")
+                print("d =", round(d, 2))
 
                 # Participants per group to detect d = 0.4 with 80% power
                 n = TTestIndPower().solve_power(effect_size=0.4, power=0.80, alpha=0.05)
@@ -749,7 +846,10 @@ extension Curriculum {
                 library(effectsize)
                 library(pwr)
 
-                cohens_d(score ~ group, data = df)
+                classroom <- read.csv("classroom.csv")
+                two_groups <- subset(classroom, method %in% c("active", "lecture"))
+                two_groups$method <- factor(two_groups$method, levels = c("active", "lecture"))
+                cohens_d(posttest ~ method, data = two_groups)
 
                 # Participants per group to detect d = 0.4 with 80% power
                 pwr.t.test(d = 0.4, power = 0.80, sig.level = 0.05,

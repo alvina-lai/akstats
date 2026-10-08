@@ -35,6 +35,8 @@ extension Curriculum {
     static let explanations: [String: [ExplanationSection]] = explanationsBasics
         .merging(explanationsCore) { $0 + $1 }
         .merging(explanationsAdvanced) { $0 + $1 }
+        .merging(explanationsExtra) { $0 + $1 }
+        .merging(explanationsSimulations) { $0 + $1 }
 }
 
 /// The “Start here” block at the top of a lesson.

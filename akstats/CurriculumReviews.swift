@@ -56,7 +56,7 @@ extension Curriculum {
         )
     }
 
-    // The capstone (Unit 12) is already a review, so it doesn't get a separate one.
+    // The capstone (Unit 13) is already a review, so it doesn't get a separate one.
     private static let reviews: [String: ReviewContent] = [
         "getting-started": gettingStartedReview,
         "foundations": foundationsReview,
@@ -70,6 +70,7 @@ extension Curriculum {
         "categorical-outcomes": categoricalReview,
         "latent-models": latentReview,
         "text-as-data": textReview,
+        "real-world": realWorldReview,
     ]
 
     // MARK: Unit 0
@@ -437,7 +438,8 @@ extension Curriculum {
                     import pingouin as pg
                     from scipy import stats
 
-                    hsb2 = pd.read_csv("https://www.openintro.org/data/csv/hsb2.csv")
+                    # openintro.org rejects Python's default user agent, so send a simple one
+                    hsb2 = pd.read_csv("https://www.openintro.org/data/csv/hsb2.csv", storage_options={"User-Agent": "pandas"})
                     print(pg.anova(data=hsb2, dv="science", between="prog", detailed=True))   # includes η²
                     print(pg.pairwise_tukey(data=hsb2, dv="science", between="prog"))
                     print(stats.kruskal(*[g["science"] for _, g in hsb2.groupby("prog")]))
@@ -531,7 +533,8 @@ extension Curriculum {
                     import statsmodels.formula.api as smf
                     from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-                    hsb2 = pd.read_csv("https://www.openintro.org/data/csv/hsb2.csv")
+                    # openintro.org rejects Python's default user agent, so send a simple one
+                    hsb2 = pd.read_csv("https://www.openintro.org/data/csv/hsb2.csv", storage_options={"User-Agent": "pandas"})
                     print(hsb2[["read", "write", "math", "science"]].corr().round(2))
 
                     m1 = smf.ols("science ~ math", data=hsb2).fit()
@@ -936,7 +939,7 @@ extension Curriculum {
                     """#,
                     r: #"""
                     library(tidyverse)
-                    library(poLCA)
+                    library(poLCA)      # loads MASS, whose select() masks dplyr's — hence dplyr::select() below
                     library(tidyLPA)
 
                     habits <- read_csv("habits.csv")
@@ -948,9 +951,9 @@ extension Curriculum {
                     table(lca[[3]]$predclass, habits$true_class)
 
                     profiles <- read_csv("profiles.csv")
-                    lpa <- profiles |> select(wellbeing, stress, support, sleep) |>
+                    lpa <- profiles |> dplyr::select(wellbeing, stress, support, sleep) |>
                       estimate_profiles(1:5, variances = "equal", covariances = "zero")
-                    get_fit(lpa) |> select(Classes, BIC, Entropy, prob_min, n_min)
+                    get_fit(lpa) |> dplyr::select(Classes, BIC, Entropy, prob_min, n_min)
                     """#,
                     answer: "1. habits → **LCA** (categorical indicators); profiles → **LPA** (continuous indicators). 2–3. BIC is lowest at **K = 3** for both, with no class under 5%. Entropy is high for the profiles and somewhat lower for the habits, whose types overlap more. 4. Both recover the true groups well, up to label order."),
             problem("An Mplus enumeration",
@@ -1032,6 +1035,138 @@ extension Curriculum {
             q("Keyness analysis is best treated as…",
               ["Confirmatory evidence", "Exploratory — generating candidate words to test later", "A reliability measure", "A clustering method"], 1,
               "Test the candidates in a confirmatory design."),
+        ]
+    )
+
+    // MARK: Unit 12
+
+    private static let realWorldReview = ReviewContent(
+        minutes: 40,
+        skills: [
+            "Diagnosing missing-data mechanisms and using multiple imputation",
+            "Weighted estimates and design-based standard errors for complex surveys",
+            "Choosing adjustment variables from a DAG; regression adjustment and propensity-score weighting",
+            "Random-effects meta-analysis, heterogeneity, and publication bias",
+            "Priors, posteriors, credible intervals, and Bayes factors",
+        ],
+        problems: [
+            problem("Imputation and a regression slope",
+                    "Using `missing.csv`:\n1. How much is missing, and does missingness depend on stress?\n2. Estimate the slope of wellbeing on stress using complete cases only.\n3. Estimate it again with 20 multiple imputations.\n4. Compare both with the slope on `wellbeing_true`. Which is closer?",
+                    hint: "Under MAR given stress, a regression *on* stress is unbiased with complete cases — but the mean isn't. Check whether that's what you find.",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    import statsmodels.api as sm
+                    import statsmodels.formula.api as smf
+                    from statsmodels.imputation import mice
+
+                    missing = pd.read_csv("missing.csv")
+                    print(missing["wellbeing"].isna().mean())
+                    print(smf.logit("I(wellbeing.isna().astype(int)) ~ stress", data=missing).fit(disp=False).params)
+
+                    cc = smf.ols("wellbeing ~ stress", data=missing).fit().params["stress"]
+                    np.random.seed(1)
+                    imp = mice.MICEData(missing[["age", "stress", "sleep", "wellbeing"]])
+                    mi = mice.MICE("wellbeing ~ stress", sm.OLS, imp).fit(n_burnin=10, n_imputations=20).params[1]
+                    truth = smf.ols("wellbeing_true ~ stress", data=missing).fit().params["stress"]
+                    print(round(cc, 3), round(mi, 3), round(truth, 3))
+                    """#,
+                    r: #"""
+                    library(mice)
+                    missing <- read.csv("missing.csv")
+                    mean(is.na(missing$wellbeing))
+                    coef(glm(is.na(wellbeing) ~ stress, data = missing, family = binomial))
+
+                    cc <- coef(lm(wellbeing ~ stress, data = missing))[["stress"]]
+                    imp <- mice(missing[c("age", "stress", "sleep", "wellbeing")], m = 20, seed = 1, printFlag = FALSE)
+                    mi <- summary(pool(with(imp, lm(wellbeing ~ stress))))$estimate[2]
+                    truth <- coef(lm(wellbeing_true ~ stress, data = missing))[["stress"]]
+                    round(c(cc, mi, truth), 3)
+                    """#,
+                    answer: "About a quarter of values are missing, and the odds of skipping rise sharply with stress (MAR). All three slopes are close: when missingness depends only on a *predictor*, complete-case regression is still unbiased for that relationship. The mean, by contrast, was badly biased — which estimates are affected depends on the analysis, not just the missingness."),
+            problem("Did tutoring work?",
+                    "Using `tutoring.csv`:\n1. Draw the DAG and list the adjustment set.\n2. Check propensity-score overlap between tutored and untutored students.\n3. Estimate the effect by regression adjustment and by IPW, with a bootstrap CI for the IPW estimate.\n4. Explain why adding `recommended` to the model would be a mistake.",
+                    hint: "All the pieces are in *Causal inference with observational data*. For the bootstrap, refit the propensity model inside each resample.",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    import statsmodels.formula.api as smf
+
+                    students = pd.read_csv("tutoring.csv")
+
+                    def ipw(d):
+                        ps = smf.logit("tutoring ~ prior_gpa + motivation + parent_degree", data=d).fit(disp=False).predict(d)
+                        w = np.where(d["tutoring"] == 1, 1 / ps, 1 / (1 - ps))
+                        t = d["tutoring"] == 1
+                        return np.average(d["exam"][t], weights=w[t]) - np.average(d["exam"][~t], weights=w[~t])
+
+                    rng = np.random.default_rng(1)
+                    boots = [ipw(students.sample(len(students), replace=True, random_state=rng)) for _ in range(500)]
+                    print(round(ipw(students), 2), np.percentile(boots, [2.5, 97.5]).round(2))
+                    """#,
+                    r: #"""
+                    students <- read.csv("tutoring.csv")
+                    ipw <- function(d) {
+                      ps <- fitted(glm(tutoring ~ prior_gpa + motivation + parent_degree, data = d, family = binomial))
+                      w <- ifelse(d$tutoring == 1, 1 / ps, 1 / (1 - ps))
+                      t <- d$tutoring == 1
+                      weighted.mean(d$exam[t], w[t]) - weighted.mean(d$exam[!t], w[!t])
+                    }
+                    set.seed(1)
+                    boots <- replicate(500, ipw(students[sample(nrow(students), replace = TRUE), ]))
+                    c(estimate = ipw(students), quantile(boots, c(0.025, 0.975)))
+                    """#,
+                    answer: "Adjust for prior GPA, motivation, and parental degree. Propensity scores overlap well (both groups span most of the range). Regression adjustment and IPW both land near the true +5 (within about a point, depending on the generated sample), with bootstrap CIs roughly ±1–1.5 points wide that include 5 — far from the naive gap of about 10. `recommended` is caused by both tutoring and exam scores — a collider — so conditioning on it distorts the estimate."),
+            problem("Pool, then explain the differences",
+                    "The first six studies in the *Meta-analysis* lesson used student samples and the last six community samples.\n1. Fit a random-effects model.\n2. Add sample type as a moderator (meta-regression). Does it explain the heterogeneity?\n3. Make a funnel plot. Could small-study effects explain the pattern instead?",
+                    hint: "In R: `rma(yi = d, vi = v, mods = ~ sample, data = studies)`. In Python, a weighted least-squares regression with weights 1 / (v + τ²) approximates it.",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    import statsmodels.formula.api as smf
+                    from statsmodels.stats.meta_analysis import combine_effects
+
+                    d = np.array([0.42, 0.15, 0.75, 0.05, 0.33, 0.55, 0.12, 0.85, 0.26, -0.10, 0.45, 0.19])
+                    n1 = np.array([40, 120, 25, 200, 60, 30, 150, 20, 80, 180, 45, 90])
+                    n2 = np.array([40, 118, 24, 205, 58, 32, 149, 22, 79, 176, 44, 92])
+                    studies = pd.DataFrame({"d": d, "v": (n1 + n2) / (n1 * n2) + d ** 2 / (2 * (n1 + n2)),
+                                            "sample": ["student"] * 6 + ["community"] * 6})
+                    tau2 = combine_effects(studies["d"], studies["v"], method_re="dl").tau2
+                    meta_reg = smf.wls("d ~ sample", data=studies, weights=1 / (studies["v"] + tau2)).fit()
+                    print(meta_reg.params, meta_reg.pvalues, sep="\n")
+                    """#,
+                    r: #"""
+                    library(metafor)
+                    d  <- c(0.42, 0.15, 0.75, 0.05, 0.33, 0.55, 0.12, 0.85, 0.26, -0.10, 0.45, 0.19)
+                    n1 <- c(40, 120, 25, 200, 60, 30, 150, 20, 80, 180, 45, 90)
+                    n2 <- c(40, 118, 24, 205, 58, 32, 149, 22, 79, 176, 44, 92)
+                    studies <- data.frame(d, v = (n1 + n2) / (n1 * n2) + d^2 / (2 * (n1 + n2)),
+                                          sample = rep(c("student", "community"), each = 6))
+                    rma(yi = d, vi = v, data = studies, method = "DL")
+                    rma(yi = d, vi = v, mods = ~ sample, data = studies, method = "DL")   # meta-regression
+                    funnel(rma(yi = d, vi = v, data = studies, method = "DL"))
+                    """#,
+                    answer: "Sample type explains little: student and community studies have similar average effects, and τ² barely shrinks. The funnel plot shows the clearer pattern — small studies report the biggest effects — so small-study effects (possibly publication bias) are the more plausible explanation of the heterogeneity. With only 12 studies, any moderator test has low power."),
+        ],
+        quiz: [
+            q("Participants who drop out of a longitudinal study had higher baseline depression, which was measured. The dropout is…",
+              ["MCAR", "MAR", "MNAR", "Irrelevant"], 1,
+              "It depends on an observed variable, so MAR — use it in the imputation or likelihood."),
+            q("Pooling estimates from 20 imputed datasets uses…",
+              ["The best of the 20", "Rubin's rules", "The median imputation", "A t-test"], 1,
+              "Average the estimates; combine within- and between-imputation variance."),
+            q("A survey's design effect is 1.8. Compared with a simple random sample of the same size, its standard errors are…",
+              ["Smaller", "About 1.34 times larger", "1.8 times larger", "Unchanged"], 1,
+              "Variance is 1.8 times larger, so SEs are √1.8 ≈ 1.34 times larger."),
+            q("Which variable should NOT be adjusted for when estimating the effect of an exercise program on fitness?",
+              ["Baseline fitness (a confounder)", "Age (a confounder)", "Weekly hours of exercise caused by the program (a mediator)", "Prior health (a confounder)"], 2,
+              "Adjusting for a mediator removes part of the effect you want to estimate."),
+            q("A random-effects meta-analysis has a 95% CI of [0.10, 0.37] and a 95% prediction interval of [−0.11, 0.58]. Which is right?",
+              ["The average effect is clearly positive, but some settings may show no effect", "The effect is not significant", "There's no heterogeneity", "The two intervals contradict each other"], 0,
+              "The CI is about the average effect; the prediction interval is about a new study's true effect."),
+            q("With a lot of data and a reasonable prior, a Bayesian posterior mean and a frequentist estimate will usually…",
+              ["Be very different", "Be close", "Have opposite signs", "Require a Bayes factor"], 1,
+              "The likelihood dominates the prior when data are plentiful."),
         ]
     )
 }

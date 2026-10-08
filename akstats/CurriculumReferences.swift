@@ -1,0 +1,123 @@
+import Foundation
+
+/// One work cited in the course, in APA 7th edition style.
+struct Reference: Identifiable {
+    /// The in-text form, e.g. "Barr et al. (2013)". Also used as the stable identity.
+    let id: String
+    /// The full reference; inline Markdown marks italics.
+    let citation: String
+    var doi: String? = nil
+    var url: String? = nil
+
+    /// Where the work can be found online: the DOI if there is one, otherwise a URL.
+    var link: URL? {
+        if let doi { return URL(string: "https://doi.org/\(doi)") }
+        return url.flatMap(URL.init(string:))
+    }
+}
+
+extension Curriculum {
+    /// Every work cited in the lessons, in APA order (alphabetical by first author). DOIs were checked against Crossref.
+    static let references: [Reference] = [
+        Reference(id: "Agresti (2007)", citation: "Agresti, A. (2007). *An introduction to categorical data analysis* (2nd ed.). Wiley."),
+        Reference(id: "Aiken & West (1991)", citation: "Aiken, L. S., & West, S. G. (1991). *Multiple regression: Testing and interpreting interactions*. Sage."),
+        Reference(id: "American Psychological Association (2020)", citation: "American Psychological Association. (2020). *Publication manual of the American Psychological Association* (7th ed.)."),
+        Reference(id: "Ardelt (2003)", citation: "Ardelt, M. (2003). Empirical assessment of a three-dimensional wisdom scale. *Research on Aging, 25*(3), 275–324.", doi: "10.1177/0164027503025003004"),
+        Reference(id: "Blei, Ng & Jordan (2003)", citation: "Blei, D. M., Ng, A. Y., & Jordan, M. I. (2003). Latent Dirichlet allocation. *Journal of Machine Learning Research, 3*, 993–1022.", url: "https://www.jmlr.org/papers/v3/blei03a.html"),
+        Reference(id: "Gale et al. (2013)", citation: "Gale, N. K., Heath, G., Cameron, E., Rashid, S., & Redwood, S. (2013). Using the framework method for the analysis of qualitative data in multi-disciplinary health research. *BMC Medical Research Methodology, 13*, Article 117.", doi: "10.1186/1471-2288-13-117"),
+        Reference(id: "Gawronski, Ng & Luke (2023)", citation: "Gawronski, B., Ng, N. L., & Luke, D. M. (2023). Truth sensitivity and partisan bias in responses to misinformation. *Journal of Experimental Psychology: General, 152*(8), 2205–2236.", doi: "10.1037/xge0001381"),
+        Reference(id: "Landis & Koch (1977)", citation: "Landis, J. R., & Koch, G. G. (1977). The measurement of observer agreement for categorical data. *Biometrics, 33*(1), 159–174.", doi: "10.2307/2529310"),
+        Reference(id: "Roberts et al. (2014)", citation: "Roberts, M. E., Stewart, B. M., Tingley, D., Lucas, C., Leder-Luis, J., Gadarian, S. K., Albertson, B., & Rand, D. G. (2014). Structural topic models for open-ended survey responses. *American Journal of Political Science, 58*(4), 1064–1082.", doi: "10.1111/ajps.12103"),
+        Reference(id: "Thomas et al. (2017)", citation: "Thomas, M. L., Bangen, K. J., Ardelt, M., & Jeste, D. V. (2017). Development of a 12-item abbreviated Three-Dimensional Wisdom Scale (3D-WS-12): Item selection and psychometric properties. *Assessment, 24*(1), 71–82.", doi: "10.1177/1073191115595714"),
+        Reference(id: "Anscombe (1973)", citation: "Anscombe, F. J. (1973). Graphs in statistical analysis. *The American Statistician, 27*(1), 17–21.", doi: "10.1080/00031305.1973.10478966"),
+        Reference(id: "Baayen, Davidson & Bates (2008)", citation: "Baayen, R. H., Davidson, D. J., & Bates, D. M. (2008). Mixed-effects modeling with crossed random effects for subjects and items. *Journal of Memory and Language, 59*(4), 390–412.", doi: "10.1016/j.jml.2007.12.005"),
+        Reference(id: "Bakdash & Marusich (2017)", citation: "Bakdash, J. Z., & Marusich, L. R. (2017). Repeated measures correlation. *Frontiers in Psychology, 8*, 456.", doi: "10.3389/fpsyg.2017.00456"),
+        Reference(id: "Bakeman (2005)", citation: "Bakeman, R. (2005). Recommended effect size statistics for repeated measures designs. *Behavior Research Methods, 37*(3), 379–384.", doi: "10.3758/BF03192707"),
+        Reference(id: "Barr et al. (2013)", citation: "Barr, D. J., Levy, R., Scheepers, C., & Tily, H. J. (2013). Random effects structure for confirmatory hypothesis testing: Keep it maximal. *Journal of Memory and Language, 68*(3), 255–278.", doi: "10.1016/j.jml.2012.11.001"),
+        Reference(id: "Bates, Kliegl, Vasishth & Baayen (2015)", citation: "Bates, D., Kliegl, R., Vasishth, S., & Baayen, H. (2015). *Parsimonious mixed models* (arXiv:1506.04967). arXiv.", url: "https://arxiv.org/abs/1506.04967"),
+        Reference(id: "Bates, Mächler, Bolker & Walker (2015)", citation: "Bates, D., Mächler, M., Bolker, B., & Walker, S. (2015). Fitting linear mixed-effects models using lme4. *Journal of Statistical Software, 67*(1), 1–48.", doi: "10.18637/jss.v067.i01"),
+        Reference(id: "Benjamini & Hochberg (1995)", citation: "Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: A practical and powerful approach to multiple testing. *Journal of the Royal Statistical Society: Series B, 57*(1), 289–300.", doi: "10.1111/j.2517-6161.1995.tb02031.x"),
+        Reference(id: "Borenstein et al. (2021)", citation: "Borenstein, M., Hedges, L. V., Higgins, J. P. T., & Rothstein, H. R. (2021). *Introduction to meta-analysis* (2nd ed.). Wiley."),
+        Reference(id: "Brown (2015)", citation: "Brown, T. A. (2015). *Confirmatory factor analysis for applied research* (2nd ed.). Guilford Press."),
+        Reference(id: "Brown (2021)", citation: "Brown, V. A. (2021). An introduction to linear mixed-effects modeling in R. *Advances in Methods and Practices in Psychological Science, 4*(1).", doi: "10.1177/2515245920960351"),
+        Reference(id: "Brysbaert & Stevens (2018)", citation: "Brysbaert, M., & Stevens, M. (2018). Power analysis and effect size in mixed effects models: A tutorial. *Journal of Cognition, 1*(1), 9.", doi: "10.5334/joc.10"),
+        Reference(id: "Bürkner (2017)", citation: "Bürkner, P.-C. (2017). brms: An R package for Bayesian multilevel models using Stan. *Journal of Statistical Software, 80*(1), 1–28.", doi: "10.18637/jss.v080.i01"),
+        Reference(id: "Bürkner & Vuorre (2019)", citation: "Bürkner, P.-C., & Vuorre, M. (2019). Ordinal regression models in psychology: A tutorial. *Advances in Methods and Practices in Psychological Science, 2*(1), 77–101.", doi: "10.1177/2515245918823199"),
+        Reference(id: "Busemeyer & Jones (1983)", citation: "Busemeyer, J. R., & Jones, L. E. (1983). Analysis of multiplicative combination rules when the causal variables are measured with error. *Psychological Bulletin, 93*(3), 549–562.", doi: "10.1037/0033-2909.93.3.549"),
+        Reference(id: "Cheung & Rensvold (2002)", citation: "Cheung, G. W., & Rensvold, R. B. (2002). Evaluating goodness-of-fit indexes for testing measurement invariance. *Structural Equation Modeling, 9*(2), 233–255.", doi: "10.1207/S15328007SEM0902_5"),
+        Reference(id: "Clark (1973)", citation: "Clark, H. H. (1973). The language-as-fixed-effect fallacy: A critique of language statistics in psychological research. *Journal of Verbal Learning and Verbal Behavior, 12*(4), 335–359.", doi: "10.1016/S0022-5371(73)80014-3"),
+        Reference(id: "Cohen (1988)", citation: "Cohen, J. (1988). *Statistical power analysis for the behavioral sciences* (2nd ed.). Lawrence Erlbaum."),
+        Reference(id: "Conover (1999)", citation: "Conover, W. J. (1999). *Practical nonparametric statistics* (3rd ed.). Wiley."),
+        Reference(id: "Coxe, West & Aiken (2009)", citation: "Coxe, S., West, S. G., & Aiken, L. S. (2009). The analysis of count data: A gentle introduction to Poisson regression and its alternatives. *Journal of Personality Assessment, 91*(2), 121–136.", doi: "10.1080/00223890802634175"),
+        Reference(id: "Cunningham (2021)", citation: "Cunningham, S. (2021). *Causal inference: The mixtape*. Yale University Press.", url: "https://mixtape.scunning.com"),
+        Reference(id: "Curran & Bauer (2011)", citation: "Curran, P. J., & Bauer, D. J. (2011). The disaggregation of within-person and between-person effects in longitudinal models of change. *Annual Review of Psychology, 62*, 583–619.", doi: "10.1146/annurev.psych.093008.100356"),
+        Reference(id: "Delacre, Lakens & Leys (2017)", citation: "Delacre, M., Lakens, D., & Leys, C. (2017). Why psychologists should by default use Welch's t-test instead of Student's t-test. *International Review of Social Psychology, 30*(1), 92–101.", doi: "10.5334/irsp.82"),
+        Reference(id: "DerSimonian & Laird (1986)", citation: "DerSimonian, R., & Laird, N. (1986). Meta-analysis in clinical trials. *Controlled Clinical Trials, 7*(3), 177–188.", doi: "10.1016/0197-2456(86)90046-2"),
+        Reference(id: "Diez, Çetinkaya-Rundel & Barr (2019)", citation: "Diez, D. M., Çetinkaya-Rundel, M., & Barr, C. D. (2019). *OpenIntro statistics* (4th ed.). OpenIntro. Cited in lessons as “OpenIntro Statistics (4th ed.)”.", url: "https://www.openintro.org/book/os/"),
+        Reference(id: "Egger et al. (1997)", citation: "Egger, M., Davey Smith, G., Schneider, M., & Minder, C. (1997). Bias in meta-analysis detected by a simple, graphical test. *BMJ, 315*(7109), 629–634.", doi: "10.1136/bmj.315.7109.629"),
+        Reference(id: "Enders (2022)", citation: "Enders, C. K. (2022). *Applied missing data analysis* (2nd ed.). Guilford Press."),
+        Reference(id: "Fabrigar et al. (1999)", citation: "Fabrigar, L. R., Wegener, D. T., MacCallum, R. C., & Strahan, E. J. (1999). Evaluating the use of exploratory factor analysis in psychological research. *Psychological Methods, 4*(3), 272–299.", doi: "10.1037/1082-989X.4.3.272"),
+        Reference(id: "Funder & Ozer (2019)", citation: "Funder, D. C., & Ozer, D. J. (2019). Evaluating effect size in psychological research: Sense and nonsense. *Advances in Methods and Practices in Psychological Science, 2*(2), 156–168.", doi: "10.1177/2515245919847202"),
+        Reference(id: "Graham, Olchowski & Gilreath (2007)", citation: "Graham, J. W., Olchowski, A. E., & Gilreath, T. D. (2007). How many imputations are really needed? Some practical clarifications of multiple imputation theory. *Prevention Science, 8*(3), 206–213.", doi: "10.1007/s11121-007-0070-9"),
+        Reference(id: "Greenhouse & Geisser (1959)", citation: "Greenhouse, S. W., & Geisser, S. (1959). On methods in the analysis of profile data. *Psychometrika, 24*(2), 95–112.", doi: "10.1007/BF02289823"),
+        Reference(id: "Hallgren (2012)", citation: "Hallgren, K. A. (2012). Computing inter-rater reliability for observational data: An overview and tutorial. *Tutorials in Quantitative Methods for Psychology, 8*(1), 23–34.", doi: "10.20982/tqmp.08.1.p023"),
+        Reference(id: "Harrell (2015)", citation: "Harrell, F. E. (2015). *Regression modeling strategies* (2nd ed.). Springer."),
+        Reference(id: "Harrer et al. (2021)", citation: "Harrer, M., Cuijpers, P., Furukawa, T. A., & Ebert, D. D. (2021). *Doing meta-analysis with R: A hands-on guide*. Chapman & Hall/CRC.", url: "https://bookdown.org/MathiasHarrer/Doing_Meta_Analysis_in_R/"),
+        Reference(id: "Hayes (2015)", citation: "Hayes, A. F. (2015). An index and test of linear moderated mediation. *Multivariate Behavioral Research, 50*(1), 1–22.", doi: "10.1080/00273171.2014.962683"),
+        Reference(id: "Hayes (2022)", citation: "Hayes, A. F. (2022). *Introduction to mediation, moderation, and conditional process analysis: A regression-based approach* (3rd ed.). Guilford Press."),
+        Reference(id: "Hayes & Krippendorff (2007)", citation: "Hayes, A. F., & Krippendorff, K. (2007). Answering the call for a standard reliability measure for coding data. *Communication Methods and Measures, 1*(1), 77–89.", doi: "10.1080/19312450709336664"),
+        Reference(id: "Heeringa, West & Berglund (2017)", citation: "Heeringa, S. G., West, B. T., & Berglund, P. A. (2017). *Applied survey data analysis* (2nd ed.). Chapman & Hall/CRC."),
+        Reference(id: "Hernán & Robins (2020)", citation: "Hernán, M. A., & Robins, J. M. (2020). *Causal inference: What if*. Chapman & Hall/CRC.", url: "https://www.hsph.harvard.edu/miguel-hernan/causal-inference-book/"),
+        Reference(id: "Higgins & Thompson (2002)", citation: "Higgins, J. P. T., & Thompson, S. G. (2002). Quantifying heterogeneity in a meta-analysis. *Statistics in Medicine, 21*(11), 1539–1558.", doi: "10.1002/sim.1186"),
+        Reference(id: "Hoffman (2015)", citation: "Hoffman, L. (2015). *Longitudinal analysis: Modeling within-person fluctuation and change*. Routledge."),
+        Reference(id: "Holm (1979)", citation: "Holm, S. (1979). A simple sequentially rejective multiple test procedure. *Scandinavian Journal of Statistics, 6*(2), 65–70.", url: "https://www.jstor.org/stable/4615733"),
+        Reference(id: "Hu & Bentler (1999)", citation: "Hu, L., & Bentler, P. M. (1999). Cutoff criteria for fit indexes in covariance structure analysis: Conventional criteria versus new alternatives. *Structural Equation Modeling, 6*(1), 1–55.", doi: "10.1080/10705519909540118"),
+        Reference(id: "Jaeger (2008)", citation: "Jaeger, T. F. (2008). Categorical data analysis: Away from ANOVAs (transformation or not) and towards logit mixed models. *Journal of Memory and Language, 59*(4), 434–446.", doi: "10.1016/j.jml.2007.11.007"),
+        Reference(id: "Johnson & LeBreton (2004)", citation: "Johnson, J. W., & LeBreton, J. M. (2004). History and use of relative importance indices in organizational research. *Organizational Research Methods, 7*(3), 238–257.", doi: "10.1177/1094428104266510"),
+        Reference(id: "Kish (1965)", citation: "Kish, L. (1965). *Survey sampling*. Wiley."),
+        Reference(id: "Koo & Li (2016)", citation: "Koo, T. K., & Li, M. Y. (2016). A guideline of selecting and reporting intraclass correlation coefficients for reliability research. *Journal of Chiropractic Medicine, 15*(2), 155–163.", doi: "10.1016/j.jcm.2016.02.012"),
+        Reference(id: "Krippendorff (2004)", citation: "Krippendorff, K. (2004). Reliability in content analysis: Some common misconceptions and recommendations. *Human Communication Research, 30*(3), 411–433.", doi: "10.1111/j.1468-2958.2004.tb00738.x"),
+        Reference(id: "Kruschke (2015)", citation: "Kruschke, J. K. (2015). *Doing Bayesian data analysis: A tutorial with R, JAGS, and Stan* (2nd ed.). Academic Press."),
+        Reference(id: "Lakens (2017)", citation: "Lakens, D. (2017). Equivalence tests: A practical primer for t tests, correlations, and meta-analyses. *Social Psychological and Personality Science, 8*(4), 355–362.", doi: "10.1177/1948550617697177"),
+        Reference(id: "Lakens, Scheel & Isager (2018)", citation: "Lakens, D., Scheel, A. M., & Isager, P. M. (2018). Equivalence testing for psychological research: A tutorial. *Advances in Methods and Practices in Psychological Science, 1*(2), 259–269.", doi: "10.1177/2515245918770963"),
+        Reference(id: "Liddell & Kruschke (2018)", citation: "Liddell, T. M., & Kruschke, J. K. (2018). Analyzing ordinal data with metric models: What could possibly go wrong? *Journal of Experimental Social Psychology, 79*, 328–348.", doi: "10.1016/j.jesp.2018.08.009"),
+        Reference(id: "Little & Rubin (2019)", citation: "Little, R. J. A., & Rubin, D. B. (2019). *Statistical analysis with missing data* (3rd ed.). Wiley."),
+        Reference(id: "Long & Ervin (2000)", citation: "Long, J. S., & Ervin, L. H. (2000). Using heteroscedasticity consistent standard errors in the linear regression model. *The American Statistician, 54*(3), 217–224.", doi: "10.1080/00031305.2000.10474549"),
+        Reference(id: "Lumley (2010)", citation: "Lumley, T. (2010). *Complex surveys: A guide to analysis using R*. Wiley."),
+        Reference(id: "Maas & Hox (2005)", citation: "Maas, C. J. M., & Hox, J. J. (2005). Sufficient sample sizes for multilevel modeling. *Methodology, 1*(3), 85–91.", doi: "10.1027/1614-2241.1.3.85"),
+        Reference(id: "MacKinnon (2008)", citation: "MacKinnon, D. P. (2008). *Introduction to statistical mediation analysis*. Lawrence Erlbaum."),
+        Reference(id: "Maxwell, Delaney & Kelley (2018)", citation: "Maxwell, S. E., Delaney, H. D., & Kelley, K. (2018). *Designing experiments and analyzing data: A model comparison perspective* (3rd ed.). Routledge."),
+        Reference(id: "McElreath (2020)", citation: "McElreath, R. (2020). *Statistical rethinking: A Bayesian course with examples in R and Stan* (2nd ed.). CRC Press."),
+        Reference(id: "McInnes, Healy & Astels (2017)", citation: "McInnes, L., Healy, J., & Astels, S. (2017). hdbscan: Hierarchical density based clustering. *Journal of Open Source Software, 2*(11), 205.", doi: "10.21105/joss.00205"),
+        Reference(id: "McNeish (2018)", citation: "McNeish, D. (2018). Thanks coefficient alpha, we'll take it from here. *Psychological Methods, 23*(3), 412–433.", doi: "10.1037/met0000144"),
+        Reference(id: "McNeish & Stapleton (2016)", citation: "McNeish, D. M., & Stapleton, L. M. (2016). The effect of small sample size on two-level model estimates: A review and illustration. *Educational Psychology Review, 28*(2), 295–314.", doi: "10.1007/s10648-014-9287-x"),
+        Reference(id: "Meteyard & Davies (2020)", citation: "Meteyard, L., & Davies, R. A. I. (2020). Best practice guidance for linear mixed-effects models in psychological science. *Journal of Memory and Language, 112*, 104092.", doi: "10.1016/j.jml.2020.104092"),
+        Reference(id: "Monroe, Colaresi & Quinn (2008)", citation: "Monroe, B. L., Colaresi, M. P., & Quinn, K. M. (2008). Fightin' words: Lexical feature selection and evaluation for identifying the content of political conflict. *Political Analysis, 16*(4), 372–403.", doi: "10.1093/pan/mpn018"),
+        Reference(id: "Norris & Ortega (2000)", citation: "Norris, J. M., & Ortega, L. (2000). Effectiveness of L2 instruction: A research synthesis and quantitative meta-analysis. *Language Learning, 50*(3), 417–528.", doi: "10.1111/0023-8333.00136"),
+        Reference(id: "Nunnally (1978)", citation: "Nunnally, J. C. (1978). *Psychometric theory* (2nd ed.). McGraw-Hill."),
+        Reference(id: "Nylund, Asparouhov & Muthén (2007)", citation: "Nylund, K. L., Asparouhov, T., & Muthén, B. O. (2007). Deciding on the number of classes in latent class analysis and growth mixture modeling: A Monte Carlo simulation study. *Structural Equation Modeling, 14*(4), 535–569.", doi: "10.1080/10705510701575396"),
+        Reference(id: "Nylund-Gibson & Choi (2018)", citation: "Nylund-Gibson, K., & Choi, A. Y. (2018). Ten frequently asked questions about latent class analysis. *Translational Issues in Psychological Science, 4*(4), 440–461.", doi: "10.1037/tps0000176"),
+        Reference(id: "Open Science Collaboration (2015)", citation: "Open Science Collaboration. (2015). Estimating the reproducibility of psychological science. *Science, 349*(6251), aac4716.", doi: "10.1126/science.aac4716"),
+        Reference(id: "Putnick & Bornstein (2016)", citation: "Putnick, D. L., & Bornstein, M. H. (2016). Measurement invariance conventions and reporting: The state of the art and future directions for psychological research. *Developmental Review, 41*, 71–90.", doi: "10.1016/j.dr.2016.06.004"),
+        Reference(id: "R Core Team (2024)", citation: "R Core Team. (2024). *R: A language and environment for statistical computing*. R Foundation for Statistical Computing.", url: "https://www.R-project.org/"),
+        Reference(id: "Reimers & Gurevych (2019)", citation: "Reimers, N., & Gurevych, I. (2019). Sentence-BERT: Sentence embeddings using Siamese BERT-networks. In *Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)* (pp. 3980–3990).", doi: "10.18653/v1/D19-1410"),
+        Reference(id: "Revelle (psych)", citation: "Revelle, W. *psych: Procedures for psychological, psychometric, and personality research* [R package].", url: "https://CRAN.R-project.org/package=psych"),
+        Reference(id: "Revelle & Condon (2019)", citation: "Revelle, W., & Condon, D. M. (2019). Reliability from α to ω: A tutorial. *Psychological Assessment, 31*(12), 1395–1411.", doi: "10.1037/pas0000754"),
+        Reference(id: "Rohrer (2018)", citation: "Rohrer, J. M. (2018). Thinking clearly about correlations and causation: Graphical causal models for observational data. *Advances in Methods and Practices in Psychological Science, 1*(1), 27–42.", doi: "10.1177/2515245917745629"),
+        Reference(id: "Rousseeuw (1987)", citation: "Rousseeuw, P. J. (1987). Silhouettes: A graphical aid to the interpretation and validation of cluster analysis. *Journal of Computational and Applied Mathematics, 20*, 53–65.", doi: "10.1016/0377-0427(87)90125-7"),
+        Reference(id: "Rubin (1976)", citation: "Rubin, D. B. (1976). Inference and missing data. *Biometrika, 63*(3), 581–592.", doi: "10.1093/biomet/63.3.581"),
+        Reference(id: "Schnoebelen, Silge & Hayes (tidylo)", citation: "Schnoebelen, T., Silge, J., & Hayes, A. *tidylo: Weighted tidy log odds ratio* [R package].", url: "https://CRAN.R-project.org/package=tidylo"),
+        Reference(id: "Singer & Willett (2003)", citation: "Singer, J. D., & Willett, J. B. (2003). *Applied longitudinal data analysis: Modeling change and event occurrence*. Oxford University Press."),
+        Reference(id: "Spurk et al. (2020)", citation: "Spurk, D., Hirschi, A., Wang, M., Valero, D., & Kauffeld, S. (2020). Latent profile analysis: A review and “how to” guide of its application within vocational behavior research. *Journal of Vocational Behavior, 120*, 103445.", doi: "10.1016/j.jvb.2020.103445"),
+        Reference(id: "Van Breukelen (2006)", citation: "Van Breukelen, G. J. P. (2006). ANCOVA versus change from baseline had more power in randomized studies and more bias in nonrandomized studies. *Journal of Clinical Epidemiology, 59*(9), 920–925.", doi: "10.1016/j.jclinepi.2006.02.007"),
+        Reference(id: "van Buuren (2018)", citation: "van Buuren, S. (2018). *Flexible imputation of missing data* (2nd ed.). Chapman & Hall/CRC.", url: "https://stefvanbuuren.name/fimd/"),
+        Reference(id: "Vasishth et al. (2018)", citation: "Vasishth, S., Nicenboim, B., Beckman, M. E., Li, F., & Kong, E. J. (2018). Bayesian data analysis in the phonetic sciences: A tutorial introduction. *Journal of Phonetics, 71*, 147–161.", doi: "10.1016/j.wocn.2018.07.008"),
+        Reference(id: "Vickers & Altman (2001)", citation: "Vickers, A. J., & Altman, D. G. (2001). Analysing controlled trials with baseline and follow up measurements. *BMJ, 323*(7321), 1123–1124.", doi: "10.1136/bmj.323.7321.1123"),
+        Reference(id: "Viechtbauer (2010)", citation: "Viechtbauer, W. (2010). Conducting meta-analyses in R with the metafor package. *Journal of Statistical Software, 36*(3), 1–48.", doi: "10.18637/jss.v036.i03"),
+        Reference(id: "Wagenmakers (2007)", citation: "Wagenmakers, E.-J. (2007). A practical solution to the pervasive problems of p values. *Psychonomic Bulletin & Review, 14*(5), 779–804.", doi: "10.3758/BF03194105"),
+        Reference(id: "Weller, Bowen & Faubert (2020)", citation: "Weller, B. E., Bowen, N. K., & Faubert, S. J. (2020). Latent class analysis: A guide to best practice. *Journal of Black Psychology, 46*(4), 287–311.", doi: "10.1177/0095798420930932"),
+        Reference(id: "Wilcox (2017)", citation: "Wilcox, R. R. (2017). *Introduction to robust estimation and hypothesis testing* (4th ed.). Academic Press."),
+        Reference(id: "Winter (2019)", citation: "Winter, B. (2019). *Statistics for linguists: An introduction using R*. Routledge."),
+        Reference(id: "Winter & Bürkner (2021)", citation: "Winter, B., & Bürkner, P.-C. (2021). Poisson regression for linguists: A tutorial introduction to modelling count data with brms. *Language and Linguistics Compass, 15*(11), e12439.", doi: "10.1111/lnc3.12439"),
+    ].sorted { $0.citation.localizedCaseInsensitiveCompare($1.citation) == .orderedAscending }
+}

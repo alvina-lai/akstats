@@ -34,10 +34,10 @@ extension Curriculum {
                 survey = pd.read_csv("survey.csv")
 
                 # Okabe–Ito: a colorblind-safe categorical palette
-                palette = {"student": "#E69F00", "online_panel": "#0072B2"}
+                palette = {"urban": "#E69F00", "rural": "#0072B2"}
 
                 fig, ax = plt.subplots(figsize=(6, 4))
-                sns.scatterplot(data=survey, x="rumination", y="anxiety", hue="source",
+                sns.scatterplot(data=survey, x="rumination", y="anxiety", hue="region",
                                 palette=palette, alpha=0.6, s=30, ax=ax)
                 ax.set(xlabel="Rumination (1–7)", ylabel="Anxiety (1–7)")
                 sns.despine()                     # remove top/right borders
@@ -50,9 +50,9 @@ extension Curriculum {
                 survey <- read_csv("survey.csv")
 
                 # Okabe–Ito: a colorblind-safe categorical palette
-                palette <- c(student = "#E69F00", online_panel = "#0072B2")
+                palette <- c(urban = "#E69F00", rural = "#0072B2")
 
-                ggplot(survey, aes(x = rumination, y = anxiety, colour = source)) +
+                ggplot(survey, aes(x = rumination, y = anxiety, colour = region)) +
                   geom_point(alpha = 0.6, size = 1.8) +
                   scale_colour_manual(values = palette) +
                   labs(x = "Rumination (1–7)", y = "Anxiety (1–7)", colour = NULL) +
@@ -62,7 +62,7 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Small multiples: one panel per group",
                 python: #"""
-                g = sns.relplot(data=survey, x="rumination", y="anxiety", col="source",
+                g = sns.relplot(data=survey, x="rumination", y="anxiety", col="region",
                                 height=3.5, alpha=0.6, color="#0072B2")
                 g.set_axis_labels("Rumination", "Anxiety")
                 plt.show()
@@ -70,18 +70,18 @@ extension Curriculum {
                 r: #"""
                 ggplot(survey, aes(rumination, anxiety)) +
                   geom_point(alpha = 0.6, colour = "#0072B2") +
-                  facet_wrap(~ source) +
+                  facet_wrap(~ region) +
                   theme_classic()
                 """#
             )),
             .keyPoint("Color has a job", "Use color only when it encodes something: **categories** get distinct hues in a fixed order, **magnitudes** get a single hue from light to dark, and **signed values** (−/+) get two hues with a neutral midpoint."),
             .exercise(Exercise(
                 title: "Your first plot",
-                prompt: "Plot `social_media` (x) against `rumination` (y), with a separate panel for each `source`. Label both axes.",
+                prompt: "Plot `social_media` (x) against `rumination` (y), with a separate panel for each `region`. Label both axes.",
                 solution: CodeSample(
                     caption: "Solution",
                     python: #"""
-                    g = sns.relplot(data=survey, x="social_media", y="rumination", col="source",
+                    g = sns.relplot(data=survey, x="social_media", y="rumination", col="region",
                                     height=3.5, alpha=0.6, color="#009E73")
                     g.set_axis_labels("Social media use", "Rumination")
                     plt.show()
@@ -89,7 +89,7 @@ extension Curriculum {
                     r: #"""
                     ggplot(survey, aes(social_media, rumination)) +
                       geom_point(alpha = 0.6, colour = "#009E73") +
-                      facet_wrap(~ source) +
+                      facet_wrap(~ region) +
                       labs(x = "Social media use", y = "Rumination") +
                       theme_classic()
                     """#
@@ -99,8 +99,8 @@ extension Curriculum {
         ],
         quiz: [
             Question(
-                prompt: "In ggplot2, what does `aes(colour = source)` do?",
-                options: ["Colors every point the same", "Maps the source variable to color", "Adds a legend title only", "Facets by source"],
+                prompt: "In ggplot2, what does `aes(colour = region)` do?",
+                options: ["Colors every point the same", "Maps the region variable to color", "Adds a legend title only", "Facets by region"],
                 answer: 1,
                 explanation: "Aesthetics map data variables to visual properties."
             ),
@@ -332,21 +332,63 @@ extension Curriculum {
                     caption: "Solution",
                     python: #"""
                     survey["mind_third"] = pd.qcut(survey["mindfulness"], 3, labels=["low", "mid", "high"])
+                    third_slopes = [np.polyfit(g["social_media"], g["rumination"], 1)[0]
+                                    for _, g in survey.groupby("mind_third", observed=True)]
+                    print(np.round(third_slopes, 3))
                     sns.lmplot(data=survey, x="social_media", y="rumination", hue="mind_third",
                                palette=["#D55E00", "#999999", "#0072B2"], scatter_kws={"alpha": 0.3})
                     plt.show()
                     """#,
                     r: #"""
-                    survey |>
-                      mutate(mind_third = factor(ntile(mindfulness, 3), labels = c("low", "mid", "high"))) |>
-                      ggplot(aes(social_media, rumination, colour = mind_third)) +
+                    survey <- survey |>
+                      mutate(mind_third = factor(ntile(mindfulness, 3), labels = c("low", "mid", "high")))
+                    third_slopes <- sapply(split(survey, survey$mind_third),
+                                           function(g) coef(lm(rumination ~ social_media, data = g))[[2]])
+                    round(third_slopes, 3)
+
+                    ggplot(survey, aes(social_media, rumination, colour = mind_third)) +
                       geom_point(alpha = 0.3) +
                       geom_smooth(method = "lm", se = FALSE) +
                       scale_colour_manual(values = c("#D55E00", "#999999", "#0072B2")) +
                       theme_classic()
                     """#
                 ),
-                answer: "The low-mindfulness line is steepest and the high-mindfulness line flattest — the same pattern as the model-based plot. (Analyze with the continuous moderator; split only for display.)"
+                answer: "The low-mindfulness line is steepest and the high-mindfulness line flattest — the same pattern as the model-based plot. (Analyze with the continuous moderator; split only for display.)",
+                selfCheck: SelfCheck(
+                    names: "`third_slopes` — the slope of rumination on social media in the low, middle, and high thirds of mindfulness",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("survey.csv").dropna(subset=["mindfulness"])
+                        ref["third"] = pd.qcut(ref["mindfulness"], 3, labels=False)
+                        # Slope = cov(x, y) / var(x) within each third
+                        expected = [g["social_media"].cov(g["rumination"]) / g["social_media"].var()
+                                    for _, g in ref.groupby("third")]
+                        check("Slopes in the low, middle, and high thirds", third_slopes, expected, tol=0.002,
+                              hint="Fit a separate line within each third, ordered low → high.")
+                        check("Steepest at low mindfulness, flattest at high", third_slopes[0] > third_slopes[2], True)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+                    library(dplyr)
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("survey.csv")
+                      ref <- ref[!is.na(ref$mindfulness), ]
+                      ref$third <- ntile(ref$mindfulness, 3)
+                      # Slope = cov(x, y) / var(x) within each third
+                      expected <- sapply(split(ref, ref$third), function(g) cov(g$social_media, g$rumination) / var(g$social_media))
+                      check("Slopes in the low, middle, and high thirds", third_slopes, expected, tol = 0.002,
+                            hint = "Fit a separate line within each third, ordered low → high.")
+                      check("Steepest at low mindfulness, flattest at high", third_slopes[[1]] > third_slopes[[3]], TRUE)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -498,6 +540,7 @@ extension Curriculum {
                     r: #"""
                     fit <- glm(correct ~ relevel(factor(structure), "simple") + relevel(factor(distance), "short"),
                                data = judgments, family = binomial)
+                    orr <- exp(coef(fit))[-1]   # odds ratios: complex vs. simple, long vs. short
                     tidy(fit, conf.int = TRUE, exponentiate = TRUE) |>
                       filter(term != "(Intercept)") |>
                       ggplot(aes(estimate, term)) +
@@ -508,7 +551,40 @@ extension Curriculum {
                       theme_classic()
                     """#
                 ),
-                answer: "Complex sentences have an OR clearly below 1 (lower odds of a correct answer); distance has an OR near 1. On a log scale, ORs of 2 and 0.5 sit the same distance from 1 — which is why odds ratios belong on log axes."
+                answer: "Complex sentences have an OR clearly below 1 (lower odds of a correct answer); distance has an OR near 1. On a log scale, ORs of 2 and 0.5 sit the same distance from 1 — which is why odds ratios belong on log axes.",
+                selfCheck: SelfCheck(
+                    names: "`orr` — the two odds ratios, complex vs. simple then long vs. short",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    import statsmodels.api as sm
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("judgments.csv")
+                        X = sm.add_constant(np.column_stack([(ref["structure"] == "complex").astype(float),
+                                                             (ref["distance"] == "long").astype(float)]))
+                        fit = sm.Logit(ref["correct"].to_numpy(), X).fit(disp=False)
+                        check("Odds ratios (complex, long)", orr, np.exp(fit.params[1:]), tol=0.001,
+                              hint="Exponentiate the coefficients; leave out the intercept.")
+                        check("Complex sentences lower the odds of a correct answer", np.asarray(orr)[0] < 1, True)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("judgments.csv")
+                      ref$complex <- as.integer(ref$structure == "complex")
+                      ref$long <- as.integer(ref$distance == "long")
+                      fit <- glm(correct ~ complex + long, data = ref, family = binomial)
+                      check("Odds ratios (complex, long)", orr, exp(coef(fit))[-1], tol = 0.001,
+                            hint = "Exponentiate the coefficients; leave out the intercept.")
+                      check("Complex sentences lower the odds of a correct answer", orr[[1]] < 1, TRUE)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -581,8 +657,91 @@ extension Curriculum {
             .caution("Common distortions", "Truncated bar axes exaggerate differences; 3-D effects and pie charts make values hard to compare; rainbow color scales create false boundaries. Avoid them."),
             .exercise(Exercise(
                 title: "Restyle a figure",
-                prompt: "Take the raw-points-plus-CI plot from *Visualizing group comparisons*, apply your APA style, and export it as both PNG (300 dpi) and PDF at 3.5 × 2.8 inches.",
-                answer: "You should get two files whose fonts stay readable at single-column width. Open the PDF and zoom in — vector graphics stay sharp at any zoom."
+                prompt: "Take the raw-points-plus-CI plot from *Visualizing group comparisons*, apply your APA style, and export it as both PNG (300 dpi) and PDF at 3.5 × 2.8 inches, named `methods.png` and `methods.pdf`.",
+                solution: CodeSample(
+                    caption: "Solution",
+                    python: #"""
+                    import pandas as pd
+                    import seaborn as sns
+                    import matplotlib.pyplot as plt
+
+                    okabe_ito = ["#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#CC79A7", "#F0E442"]
+                    sns.set_theme(style="ticks", context="paper", palette=okabe_ito, font_scale=1.1)
+
+                    classroom = pd.read_csv("classroom.csv")
+                    order = ["lecture", "active", "flipped"]
+                    fig, ax = plt.subplots(figsize=(3.5, 2.8))
+                    sns.stripplot(data=classroom, x="method", y="posttest", order=order,
+                                  color="0.65", alpha=0.6, jitter=0.15, ax=ax)
+                    sns.pointplot(data=classroom, x="method", y="posttest", order=order, errorbar=("ci", 95),
+                                  color="black", linestyle="none", capsize=0.15, ax=ax)
+                    ax.set(xlabel=None, ylabel="Post-test score (0–100)")
+                    sns.despine()
+                    fig.savefig("methods.png", dpi=300, bbox_inches="tight")
+                    fig.savefig("methods.pdf", bbox_inches="tight")
+                    """#,
+                    r: #"""
+                    library(tidyverse)
+
+                    theme_apa <- function(base_size = 11) {
+                      theme_classic(base_size = base_size) +
+                        theme(legend.position = "top", legend.title = element_blank(),
+                              axis.text = element_text(colour = "black"))
+                    }
+
+                    classroom <- read_csv("classroom.csv") |>
+                      mutate(method = factor(method, levels = c("lecture", "active", "flipped")))
+                    summary_df <- classroom |>
+                      group_by(method) |>
+                      summarise(mean = mean(posttest), ci = qt(0.975, n() - 1) * sd(posttest) / sqrt(n()))
+
+                    p <- ggplot(classroom, aes(method, posttest)) +
+                      geom_jitter(width = 0.15, alpha = 0.6, colour = "grey65") +
+                      geom_pointrange(data = summary_df, aes(y = mean, ymin = mean - ci, ymax = mean + ci), size = 0.4) +
+                      labs(x = NULL, y = "Post-test score (0–100)") +
+                      theme_apa()
+
+                    ggsave("methods.png", p, width = 3.5, height = 2.8, dpi = 300)
+                    ggsave("methods.pdf", p, width = 3.5, height = 2.8)
+                    """#
+                ),
+                answer: "You should get two files whose fonts stay readable at single-column width. Open the PDF and zoom in — vector graphics stay sharp at any zoom.",
+                selfCheck: SelfCheck(
+                    names: "two files in your project folder: `methods.png` and `methods.pdf`",
+                    python: #"""
+                    import struct
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        with open("methods.png", "rb") as f:
+                            head = f.read(24)
+                        check("methods.png is a PNG", head[:8] == b"\x89PNG\r\n\x1a\n", True)
+                        width, height = struct.unpack(">II", head[16:24])   # pixel size, from the PNG header
+                        # bbox_inches="tight" trims or pads the edges a little, so allow some slack.
+                        check("Width ≈ 3.5 in at 300 dpi", width / 300, 3.5, tol=0.12,
+                              hint="figsize=(3.5, 2.8) and savefig(..., dpi=300).")
+                        check("Height ≈ 2.8 in at 300 dpi", height / 300, 2.8, tol=0.12)
+                        with open("methods.pdf", "rb") as f:
+                            check("methods.pdf is a PDF", f.read(5) == b"%PDF-", True)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      head <- readBin("methods.png", "raw", 24)
+                      check("methods.png is a PNG", identical(head[1:8], as.raw(c(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))), TRUE)
+                      # Pixel size, from the PNG header (two 4-byte big-endian integers)
+                      width  <- sum(as.integer(head[17:20]) * 256^(3:0))
+                      height <- sum(as.integer(head[21:24]) * 256^(3:0))
+                      check("Width ≈ 3.5 in at 300 dpi", width / 300, 3.5, tol = 0.12,
+                            hint = "ggsave(..., width = 3.5, height = 2.8, dpi = 300).")
+                      check("Height ≈ 2.8 in at 300 dpi", height / 300, 2.8, tol = 0.12)
+                      check("methods.pdf is a PDF", identical(readBin("methods.pdf", "raw", 5), charToRaw("%PDF-")), TRUE)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [

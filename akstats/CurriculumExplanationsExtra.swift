@@ -1,0 +1,237 @@
+import Foundation
+
+// Beginner-level explanations for the lessons on probability, multiple comparisons,
+// repeated measures, equivalence, diagnostics, CFA, growth and count models (Units 3–9),
+// and for Unit 12 (real-world data & evidence).
+
+extension Curriculum {
+    static let explanationsExtra: [String: [ExplanationSection]] = [
+
+        // MARK: Unit 3
+
+        "probability": [
+            idea("Probability is the language of uncertainty",
+                 "A probability is a number between 0 and 1 describing how often something happens in the long run. Most of statistics rests on a few rules for combining them — and on keeping track of **what you're conditioning on**.",
+                 "A **conditional probability**, P(A | B), is the probability of A among only the cases where B is true. P(positive test | disorder) is how often people with the disorder test positive. P(disorder | positive test) is how often people who test positive have the disorder. These sound alike but can be wildly different.",
+                 "**Bayes' rule** converts one into the other, and it needs the **base rate** — how common the disorder is to begin with. When something is rare, even a good test produces mostly false alarms.",
+                 "Two distributions describe counts. The **binomial** counts successes in a fixed number of independent tries (correct answers out of 20). The **Poisson** counts events in a stretch of time or text when they occur at a steady average rate (speech errors per minute)."),
+            analogy("Airport security alarms",
+                    "Metal detectors go off for almost everyone carrying a weapon. But nearly every alarm you'll ever see is for a belt buckle or keys, because almost nobody carries a weapon. A high P(alarm | weapon) doesn't mean a high P(weapon | alarm) — the base rate decides that."),
+            worked("A positive screening result",
+                   "An anxiety questionnaire flags 85% of people with the disorder and wrongly flags 10% of people without it. 10% of patients have the disorder.",
+                   "Imagine **1,000 patients**: 100 have the disorder, and 85 of them screen positive. 900 don't, and 90 of them screen positive anyway.",
+                   "Of the 85 + 90 = **175** positives, only 85 have the disorder: P(disorder | positive) = 85 / 175 ≈ **.49**.",
+                   "Despite a good-looking test, a positive result is close to a coin flip."),
+            inWords("Reporting probabilities",
+                    "“The questionnaire's positive predictive value in this clinic was .49: about half of the patients who screened positive met diagnostic criteria.”",
+                    "“The participant answered 16 of 20 two-choice trials correctly; under guessing, the probability of 16 or more correct is .006 (binomial test).”"),
+        ],
+
+        // MARK: Unit 4
+
+        "multiple-comparisons": [
+            idea("More tests, more false alarms",
+                 "Every test at α = .05 has a 5% chance of a false positive when nothing is going on. One test is fine. But a study that tests 20 outcomes has about a **64%** chance of at least one false “finding” even if nothing is real.",
+                 "**Corrections** keep the error rate under control across the whole **family** of tests. **Bonferroni** and **Holm** control the **family-wise error rate**: the chance of even one false positive. Holm is a smarter, step-by-step version that is never less powerful.",
+                 "The **false discovery rate** (Benjamini–Hochberg) asks a different question: among the results you call significant, what share are false? It's more forgiving and much more powerful when you test many things and can live with a few false leads.",
+                 "What counts as a family should be decided **before** looking at the data — usually the set of tests that answer one research question."),
+            analogy("Buying lottery tickets",
+                    "One ticket rarely wins. Buy twenty, and your chance of *some* win climbs a lot — but that doesn't make any single ticket luckier. A significant result among twenty tests is like a winning ticket among twenty: you'd expect one by chance."),
+            worked("Four p-values, three corrections",
+                   "Four tests give p = .010, .020, .030, .040.",
+                   "**Bonferroni** (× 4): .04, .08, .12, .16 → **1** significant.",
+                   "**Holm** (sorted, × 4, 3, 2, 1, never decreasing): .04, .06, .06, .06 → **1** significant.",
+                   "**Benjamini–Hochberg** (× 4/1, 4/2, 4/3, 4/4, never increasing from the top): .04, .04, .04, .04 → all **4** significant. Same data — very different conclusions, depending on which error rate you control."),
+            inWords("Reporting a correction",
+                    "“We tested eight correlations with anxiety and controlled the false discovery rate with the Benjamini–Hochberg procedure. Four correlations remained significant (adjusted p < .05).”"),
+        ],
+
+        "repeated-measures": [
+            idea("Every person is their own control",
+                 "When the same people experience every condition, you can compare each person with **themselves**. Stable differences between people — some rate everything high, some react slowly — drop out of the comparison, which makes within-subject designs very powerful.",
+                 "A **repeated-measures ANOVA** tests a within-subject effect against how **inconsistently** people respond to the conditions, not against how much people differ overall. With two conditions, it's exactly a paired t-test (F = t²).",
+                 "With three or more conditions, one extra assumption appears: **sphericity** — roughly, that all pairs of conditions differ equally consistently. If it fails, the **Greenhouse–Geisser** correction makes the test more conservative.",
+                 "A **mixed ANOVA** adds a between-subject factor, such as teaching method in a pre/post study. The key question is usually the **interaction**: did scores change more in one group than another?"),
+            analogy("Weighing yourself on the same scale",
+                    "To see whether a holiday changed your weight, you'd compare *your* weight before and after — not your weight with a stranger's. Differences between people (much larger than a holiday's effect) are irrelevant to the question. Within-subject designs work the same way."),
+            worked("Why pairing helps",
+                   "Three people rate two conditions: A gives 10 and 13, B gives 20 and 22, C gives 30 and 34.",
+                   "The condition means are 20 and 23, but people differ by 10 points or more, so a between-subjects comparison would see a 3-point difference buried in noise.",
+                   "Within each person, the differences are **3, 2, and 4**: mean 3, SD 1. The paired t = 3 / (1 / √3) ≈ 5.2, so the repeated-measures F = t² ≈ **27** — a very clear effect."),
+            inWords("Reporting a repeated-measures ANOVA",
+                    "“A 2 (structure) × 2 (distance) repeated-measures ANOVA on participants' mean ratings showed main effects of structure and distance, qualified by an interaction, F(1, 39) = 45.3, p < .001, η²G = .04: long distances lowered ratings more for complex sentences.”"),
+        ],
+
+        "equivalence": [
+            idea("Showing that an effect is too small to matter",
+                 "A non-significant result is easy to over-read. With a small sample, p = .40 is compatible with no effect **and** with a large one. “We found no difference” is often just “we couldn't tell”.",
+                 "An **equivalence test** asks a different question. First decide the **smallest effect size of interest** — the smallest difference that would matter, say ±0.3 points on a 1–7 scale. Then test whether the effect is reliably **inside** that band.",
+                 "The **TOST** procedure runs two one-sided tests: is the effect above −0.3, and is it below +0.3? If both are significant, the effect is statistically equivalent to zero. The same decision comes from checking whether the **90% CI** lies entirely inside the bounds.",
+                 "Combined with the usual test, you get four possible conclusions: a real effect, a negligible effect, a real but negligible effect, or an inconclusive study."),
+            analogy("A kitchen scale accurate to the nearest gram",
+                    "If a recipe calls for 100 g of flour and you need the bowl within ±5 g, a scale that reads “98 g, give or take 2” tells you you're within tolerance. A scale that reads “98 g, give or take 30” can't tell you — not because you're wrong, but because the measurement is too imprecise. Equivalence tests ask whether your study is precise enough to say “close enough”."),
+            worked("A TOST by hand",
+                   "Urban minus rural anxiety: difference = 0.05, SE = 0.10. Bounds: ±0.3.",
+                   "Lower test: (0.05 + 0.3) / 0.10 = 3.5 → p ≈ .0002. Upper test: (0.05 − 0.3) / 0.10 = −2.5 → p ≈ .006.",
+                   "TOST p = the larger one = **.006**, so the difference is statistically equivalent to zero.",
+                   "Check with the 90% CI: 0.05 ± 1.645 × 0.10 = **[−0.11, 0.21]**, which sits inside (−0.3, +0.3)."),
+            inWords("Reporting an equivalence test",
+                    "“The regional difference in anxiety was not significant, p = .62. An equivalence test against bounds of ±0.3 scale points, set before data collection, was significant, p = .006, 90% CI [−0.11, 0.21]: any regional difference is smaller than we would consider meaningful.”"),
+        ],
+
+        // MARK: Unit 5
+
+        "regression-diagnostics": [
+            idea("Check the model, not just the p-values",
+                 "Every regression makes assumptions: a straight-line relationship, residuals with constant spread, roughly normal errors, and no single case driving the results. **Diagnostics** check these with the **residuals** — what's left after the model's predictions.",
+                 "A **residuals-vs-fitted plot** should look like a shapeless band. A curve means the relationship isn't linear; a fan shape means **heteroskedasticity** (the spread changes).",
+                 "**Leverage** measures how unusual a case's predictor values are. A high-leverage case that also has a large residual is **influential**: dropping it would change the results. **Cook's distance** combines both.",
+                 "If the spread isn't constant, **robust (HC3) standard errors** fix the uncertainty estimates without changing the coefficients. If a case is influential, investigate it and report results with and without it."),
+            analogy("A seesaw",
+                    "A child sitting near the pivot barely moves a seesaw; the same child at the very end tips it. Cases far from the middle of the predictors sit at the end of the seesaw (high leverage). They only tip the regression line if they also sit far from where the line would otherwise go (a large residual)."),
+            worked("One unusual respondent",
+                   "The model predicts an anxiety score of 3.8 for a respondent who actually scored 5.9: a residual of **2.1**.",
+                   "The residual SD is 0.85, so this is about 2.1 / 0.85 ≈ **2.5** SDs from the line — unusual, but in a sample of 375, a few such cases are expected.",
+                   "Their predictor values are typical (low leverage), so their Cook's distance is small: dropping them would barely change the slope. A case with extreme predictor values *and* a residual like this could move the slope noticeably."),
+            inWords("Reporting diagnostics",
+                    "“Residual plots showed no clear nonlinearity, but residual variance increased with fitted values (Breusch–Pagan p = .01), so we report HC3 robust standard errors. One respondent had a Cook's distance of 0.32 (4/n = 0.011); the results were substantively unchanged without them.”"),
+        ],
+
+        // MARK: Unit 7
+
+        "cfa": [
+            idea("Testing a measurement model",
+                 "A questionnaire score assumes that several items all reflect one underlying construct. **Confirmatory factor analysis** tests that assumption: you specify which items measure which **latent factor**, and the model predicts how strongly every pair of items should correlate.",
+                 "If item A and item B both reflect mindfulness with **loadings** of .8, the model predicts they correlate .8 × .8 = .64. **Fit indices** (CFI, RMSEA, SRMR) summarize how closely the predicted correlations match the observed ones.",
+                 "Standardized loadings say how good each item is; they also give a reliability estimate, **ω**, that doesn't assume all items are equally good (as Cronbach's α does).",
+                 "Before comparing groups on a scale, check **measurement invariance**: equal loadings (metric) and equal intercepts (scalar) mean the scale measures the same thing, on the same metric, in each group."),
+            analogy("Several thermometers in one room",
+                    "Six thermometers each show the room's temperature plus their own small error. If one temperature explains all six readings, they'll rise and fall together in a predictable way. A thermometer that wanders independently — or two that agree with each other more than with the rest — shows up as misfit. CFA asks the same question about questionnaire items."),
+            worked("From loadings to ω",
+                   "A three-item scale has standardized loadings .7, .8, and .8.",
+                   "Sum of loadings: 2.3, squared: **5.29**. Error variances: (1 − .49) + (1 − .64) + (1 − .64) = **1.23**.",
+                   "ω = 5.29 / (5.29 + 1.23) ≈ **.81**.",
+                   "The model also predicts the correlation between items 2 and 3: .8 × .8 = .64. If the observed correlation were .40, that pair would be a source of misfit."),
+            inWords("Reporting a CFA",
+                    "“A one-factor CFA fit well, χ²(9) = 8.3, p = .51, CFI = 1.00, RMSEA = .00, SRMR = .02, with standardized loadings from .72 to .84 (ω = .90). Constraining loadings and intercepts to be equal across regions did not worsen fit (ΔCFI < .01), supporting scalar invariance.”"),
+        ],
+
+        "growth-models": [
+            idea("Modeling change",
+                 "With three or more measurements per person, you can describe each person's **trajectory**: where they start and how fast they change. A **growth model** is a mixed model with time as a predictor, a random intercept (starting level), and a **random slope for time** (growth rate).",
+                 "The fixed effects describe the **average** trajectory; the random effects describe how much people differ in their starting points and growth rates — and whether people who start higher also grow faster.",
+                 "Person-level predictors can explain differences in growth. In a randomized study, the **time × group interaction** is the treatment effect on the growth rate.",
+                 "How you code time matters for interpretation: with time = 0 at baseline, the intercept is the starting level; centering time at the last wave makes it the final level. The model fit doesn't change."),
+            analogy("Height marks on a kitchen door",
+                    "Each child's pencil marks form their own line up the doorframe. Some started taller, some are growing faster. The average of all the lines is the typical growth curve; the spread of the lines around it is what the random intercepts and slopes describe. A missing mark one year doesn't erase the others."),
+            worked("One student's predicted trajectory",
+                   "Average model: score = 100 + 5 × wave for control students; the intervention adds 2 points per wave.",
+                   "A student in the intervention group has a random intercept of +6 and a random slope of −1.",
+                   "Their predicted score at wave 0: 100 + 6 = **106**. Their growth per wave: 5 + 2 − 1 = **6**. At wave 4: 106 + 6 × 4 = **130**."),
+            inWords("Reporting a growth model",
+                    "“Reading scores grew by 5.1 points per wave in the control group (95% CI [4.7, 5.5]) and 2.0 points per wave faster in the intervention group (95% CI [1.4, 2.6]). Students varied in their growth rates (SD = 1.5 points per wave).”"),
+        ],
+
+        // MARK: Unit 9
+
+        "count-models": [
+            idea("Counting events",
+                 "Counts — fillers per interview, errors per essay, arrests per neighborhood — are whole numbers starting at zero, usually skewed, with more variability when the average is higher. **Poisson regression** models the logarithm of the expected count, so predictions are always positive and effects multiply.",
+                 "exp(b) is a **rate ratio**: a value of 1.4 means 40% more events per unit of exposure.",
+                 "When people are observed for different amounts of time (or texts have different lengths), include log(exposure) as an **offset**, so the model describes rates — per minute, per 1,000 words.",
+                 "The Poisson model assumes the variance equals the mean. Real counts usually vary more (**overdispersion**), which makes Poisson standard errors too small. **Negative binomial regression** adds a parameter for the extra variance."),
+            analogy("Counting cars on a road",
+                    "Ten cars in 5 minutes and twenty cars in 15 minutes aren't “twenty is more” — the first road is busier (2 per minute vs. 1.3). Count models with an offset compare rates, not raw totals, in exactly this way."),
+            worked("From a coefficient to fillers",
+                   "The coefficient for being evaluated is 0.34. The rate ratio is e^0.34 ≈ **1.40**.",
+                   "If relaxed speakers produce 0.8 fillers per minute, evaluated speakers are predicted to produce 0.8 × 1.40 = **1.12** per minute.",
+                   "In a 10-minute interview: **8** fillers vs. **11.2**. In a 5-minute interview, half as many — the offset handles that automatically."),
+            inWords("Reporting a count model",
+                    "“A negative binomial model with log(interview length) as an offset showed that speakers who believed they were being evaluated produced more fillers per minute (IRR = 1.41, 95% CI [1.20, 1.66]), as did second-language speakers (IRR = 1.58, 95% CI [1.34, 1.86]).”"),
+        ],
+
+        // MARK: Unit 12
+
+        "missing-data": [
+            idea("Why values are missing matters more than how many",
+                 "Most software quietly drops any row with a missing value. Whether that's harmless depends on the **mechanism**. If values are missing **completely at random** (MCAR) — a lost page, a random glitch — you lose power but not accuracy.",
+                 "If missingness depends on things you **observed** (**MAR**) — stressed people skip the wellbeing question, and you measured stress — the remaining cases are no longer representative, and complete-case results are biased. But because you measured the cause, you can correct for it.",
+                 "If missingness depends on the **missing value itself** (**MNAR**) — people with very low wellbeing skip the wellbeing question, whatever their stress — no standard method fully fixes it; sensitivity analyses show how much it could matter.",
+                 "**Multiple imputation** fills in each missing value several times with plausible guesses based on the other variables, analyzes each completed dataset, and pools the results with **Rubin's rules**, so the standard errors reflect the uncertainty about the missing values."),
+            analogy("Phone surveys and night-shift workers",
+                    "A phone survey that calls in the evening misses people who work nights. If night-shift workers are less healthy and you know who works nights, you can adjust (MAR). If, instead, the sickest people are too unwell to answer whatever their job (MNAR), the survey will look healthier than the population, and nothing in the data tells you by how much."),
+            worked("Rubin's rules with three imputations",
+                   "Three imputed datasets give mean wellbeing estimates of 4.0, 4.2, and 4.1, each with SE 0.10.",
+                   "Pooled estimate: (4.0 + 4.2 + 4.1) / 3 = **4.1**.",
+                   "Within-imputation variance: 0.10² = 0.01. Between-imputation variance: the variance of 4.0, 4.2, 4.1 = 0.01.",
+                   "Total variance: 0.01 + (1 + 1/3) × 0.01 ≈ 0.0233, so SE = √0.0233 ≈ **0.15** — half again as large as any single dataset suggests."),
+            inWords("Reporting missing data",
+                    "“Wellbeing was missing for 23% of participants. Missingness was strongly related to stress, so we assumed data were missing at random and used multiple imputation by chained equations (20 imputations, with stress, sleep, and age as predictors). The pooled mean was 4.02 (SE = 0.04), compared with 4.19 among complete cases.”"),
+        ],
+
+        "survey-weights": [
+            idea("Making a sample look like the population",
+                 "Large surveys don't sample everyone with equal probability. They sample within regions (**strata**), pick towns or schools first and people within them (**clusters**), and deliberately **oversample** small groups so there are enough of them to study.",
+                 "A **survey weight** is the number of people in the population each respondent represents — the inverse of their chance of being selected. Weighted estimates undo the deliberate imbalances.",
+                 "Clustering has a separate cost: people in the same town are similar, so 20 interviews in one town carry less information than 20 interviews spread across the country. **Design-based standard errors** account for this; ordinary ones are too small.",
+                 "The **design effect** summarizes the cost: a design effect of 2 means the survey is about as precise as a simple random sample half its size."),
+            analogy("A party with two rooms",
+                    "You want to know how many guests enjoyed a party with 70 people in the kitchen and 30 in the garden, so you ask 10 people in each room. The garden is overrepresented in your 20 answers: each garden answer stands for 3 guests and each kitchen answer for 7. Weighting by 7 and 3 gives the right average for the whole party."),
+            worked("Weighting the poll",
+                   "60% of urban respondents and 35% of rural respondents support the policy, with 500 interviews in each region.",
+                   "Unweighted: (0.60 + 0.35) / 2 = **47.5%** — as if the country were half rural.",
+                   "But only 30% of adults are rural, so weighted: 0.7 × 0.60 + 0.3 × 0.35 = **52.5%**.",
+                   "Weights of 1,400 (urban) and 600 (rural) give Kish's effective sample size: 1,000,000² / (500 × 1,400² + 500 × 600²) ≈ **862**."),
+            inWords("Reporting survey estimates",
+                    "“Using the survey weights and accounting for clustering within towns and stratification by region, an estimated 51.6% of adults supported the policy (95% CI [47.0, 56.2]; design effect = 2.2).”"),
+        ],
+
+        "causal-inference": [
+            idea("From association to causation",
+                 "In observational data, people choose (or are steered into) the “treatment”, so treated and untreated groups differ in other ways too. Those other differences — **confounders** — can create or hide an association.",
+                 "Causal inference starts with a picture of what causes what: a **DAG**. A **backdoor path** is a non-causal route from treatment to outcome through a common cause. To estimate the causal effect, **adjust for a set of variables that blocks every backdoor path**.",
+                 "Not every variable should be adjusted for. A **collider** is caused by both the treatment and the outcome; adjusting for it creates a false association. A **mediator** lies on the causal path; adjusting for it removes part of the effect you want.",
+                 "**Propensity scores** — each person's probability of treatment given the confounders — offer another route. Weighting people by the inverse of that probability builds a comparison in which treatment no longer depends on the confounders. Both approaches assume there are **no unmeasured confounders**."),
+            analogy("Hospitals and death rates",
+                    "People who go to hospital are more likely to die than people who don't — not because hospitals are dangerous, but because sick people go to hospital. Illness is a confounder: it causes both the “treatment” (hospital) and the outcome (death). Compare patients who are equally ill, and hospitals look very different."),
+            worked("Where a 10-point gap comes from",
+                   "Tutored students average 72 on the exam and the others 62: a **10-point** gap.",
+                   "But tutored students are more motivated, and motivation raises scores by itself. Among students with the same motivation, prior GPA, and parental education, the gap is about **5** points. The other 5 points were confounding.",
+                   "In IPW, a tutored student whose propensity score was .80 gets weight 1 / .80 = **1.25**; a tutored student with a score of .20 gets weight **5** — they stand in for the many similar students who weren't tutored."),
+            inWords("Reporting a causal analysis",
+                    "“Based on the DAG in Figure 1, we adjusted for prior GPA, motivation, and parental education. Tutoring was associated with a 5.1-point higher exam score (95% CI [3.9, 6.3]); an inverse-probability-weighted estimate was similar (5.3). This estimate can be interpreted causally only if no unmeasured variable affects both tutoring and exam scores.”"),
+        ],
+
+        "meta-analysis": [
+            idea("Combining studies",
+                 "Single studies are noisy, and their results vary. A **meta-analysis** pools the **effect sizes** from many studies into one estimate, giving more weight to more precise (usually larger) studies.",
+                 "A **common-effect** model assumes every study estimates the same true effect. A **random-effects** model assumes true effects genuinely differ between studies — different populations, versions of the intervention, measures — and estimates both the average effect and how much true effects vary (**τ²**).",
+                 "**Heterogeneity** is part of the result: **I²** says what share of the variation between studies is real, and the **prediction interval** shows the range a new study's true effect could fall in.",
+                 "Meta-analyses are only as good as the studies they include. If null results tend to go unpublished, the pooled effect is inflated. **Funnel plots** and **Egger's test** look for the telltale pattern: small studies reporting larger effects."),
+            analogy("Combining weather stations",
+                    "To estimate today's temperature across a region, you'd average readings from many weather stations, trusting the well-maintained ones more. If the stations are in genuinely different microclimates, the average is still useful — but you'd also want to know how much the stations differ, not just their mean."),
+            worked("Two studies, inverse-variance weights",
+                   "Study 1: d = 0.40 with variance 0.04 (weight 1 / 0.04 = **25**). Study 2: d = 0.10 with variance 0.01 (weight **100**).",
+                   "Common-effect estimate: (25 × 0.40 + 100 × 0.10) / (25 + 100) = 20 / 125 = **0.16**.",
+                   "The larger, more precise study pulls the estimate toward its own 0.10. A random-effects model would add τ² to both variances, evening out the weights and moving the estimate toward the simple average of 0.25."),
+            inWords("Reporting a meta-analysis",
+                    "“A random-effects meta-analysis of 12 studies (DerSimonian–Laird) gave a pooled d = 0.24, 95% CI [0.10, 0.37], with moderate heterogeneity, Q(11) = 22.6, p = .02, I² = 51%. The 95% prediction interval, [−0.11, 0.58], includes zero. Egger's test indicated funnel-plot asymmetry (p < .001), so the pooled estimate may be inflated by small-study effects.”"),
+        ],
+
+        "bayesian": [
+            idea("Updating beliefs with data",
+                 "Bayesian statistics treats unknown quantities — an accuracy, a slope — as uncertain, and describes that uncertainty with a probability distribution. You start with a **prior**, see the data, and end with a **posterior**: what's plausible now.",
+                 "The rule is simple: **posterior ∝ likelihood × prior**. Values that both seemed plausible beforehand and predict the data well end up most plausible afterward.",
+                 "The posterior allows direct statements that p-values and confidence intervals don't: “there's a 95% probability the slope lies between 0.38 and 0.52”, or “a 97% probability the effect is positive”.",
+                 "With little data, the prior matters; with lots of data, reasonable priors lead to nearly the same answer. A **Bayes factor** compares how well two hypotheses predicted the data, and can express evidence **for** a null hypothesis."),
+            analogy("A detective with a suspect list",
+                    "A detective starts with hunches about who's likely guilty (the prior). Each clue makes some suspects more plausible and others less (the likelihood). The updated list (the posterior) becomes the starting point for the next clue. Strong clues outweigh initial hunches; weak clues barely move them."),
+            worked("Updating twice",
+                   "Start with a flat Beta(1, 1) prior on a participant's accuracy. They get 7 of 10 right.",
+                   "Posterior: Beta(1 + 7, 1 + 3) = Beta(8, 4), with mean 8 / 12 ≈ **.67**.",
+                   "They do another 10 trials and get 7 right again. Yesterday's posterior is today's prior: Beta(8 + 7, 4 + 3) = Beta(15, 7), with mean 15 / 22 ≈ **.68** — and a narrower interval, because there's more data."),
+            inWords("Reporting a Bayesian analysis",
+                    "“We fit a Bayesian linear regression (brms; 4 chains × 2,000 iterations) with Normal(0, 1) priors on the slopes. The posterior mean for rumination was 0.45, 95% credible interval [0.38, 0.52]; the posterior probability of a positive effect exceeded .999. All R̂ values were 1.00.”"),
+        ],
+    ]
+}

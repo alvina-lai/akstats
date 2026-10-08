@@ -153,7 +153,7 @@ extension Curriculum {
                    "`wellbeing ~ income * age` means “predict wellbeing from income, age, **and** their interaction” — whether the effect of income depends on age. The `*` is shorthand for `income + age + income:age`.",
                    "`rt ~ condition + (1 | participant)` (in R's lme4) adds a random intercept for each participant — you'll meet this in Unit 7."),
             inWords("Citing software",
-                    "Cite the packages that did the statistical work, with versions: “Mixed models were estimated with lme4 1.1-35 (Bates et al., 2015).” Most packages print their citation with `citation(\"lme4\")` in R."),
+                    "Cite the packages that did the statistical work, with versions: “Mixed models were estimated with lme4 1.1-35 (Bates, Mächler, et al., 2015).” Most packages print their citation with `citation(\"lme4\")` in R."),
         ],
 
         "tidy-data": [
@@ -279,7 +279,7 @@ extension Curriculum {
         "effect-sizes": [
             idea("Significance says “whether”; effect size says “how much”",
                  "With a big enough sample, even a tiny, unimportant difference becomes statistically significant. With a small sample, an important difference can fail to reach significance. So a p-value alone can't tell you whether an effect **matters**. That's the job of an **effect size**.",
-                 "**Cohen's d** expresses a difference between two means in standard deviation units: d = (mean₁ − mean₂) / SD. A d of 0.5 means the groups differ by half an SD. Rough benchmarks are 0.2 small, 0.5 medium, 0.8 large — but what counts as meaningful depends on the field.",
+                 "**Cohen's d** expresses a difference between two means in standard deviation units: d = (mean₁ − mean₂) / SD. A d of 0.5 means the groups differ by half an SD. Cohen's (1988) rough benchmarks are 0.2 small, 0.5 medium, 0.8 large — but Cohen himself warned that what counts as meaningful depends on the field.",
                  "Other effect sizes fit other analyses: **r** for correlations, **η²** (eta squared) for the share of variance explained in ANOVA, **odds ratios** for binary outcomes.",
                  "**Power** is the probability that a study will detect an effect **if it really exists**. It depends on the true effect size, the sample size, and α. Researchers aim for at least 80% power, and plan sample sizes before collecting data to get there."),
             analogy("Hearing a whisper vs. a shout",

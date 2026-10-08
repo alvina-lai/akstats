@@ -28,7 +28,7 @@ extension Curriculum {
                     "**A representative sample.** The bootstrap can't fix a biased sample; it only quantifies sampling noise.",
                     "**Enough resamples** that the CI endpoints are stable, and a sample that isn't tiny (with n < 15 or so, bootstrap CIs are too narrow).",
                 ],
-                reading: "OpenIntro Statistics (4th ed.), §2.3 (randomization as a simulation-based approach to inference) and §5.1 (sampling variability)."
+                reading: "OpenIntro Statistics (4th ed.), §2.3 (case study: simulating a randomization test) and §5.1 (point estimates and sampling variability)."
             )),
             .chart(ChartExample(
                 title: "A bootstrap distribution and its 95% CI",
@@ -110,18 +110,54 @@ extension Curriculum {
                     idx = np.arange(len(survey))
                     boots = [survey.iloc[rng.choice(idx, len(idx))][["rumination", "anxiety"]].corr().iloc[0, 1]
                              for _ in range(5000)]
-                    print(np.percentile(boots, [2.5, 97.5]))
-                    print(pg.corr(survey["rumination"], survey["anxiety"])["CI95%"])
+                    boot_ci = np.percentile(boots, [2.5, 97.5])
+                    r_ci = pg.corr(survey["rumination"], survey["anxiety"])["CI95%"].iloc[0]
+                    print(boot_ci, r_ci)
                     """#,
                     r: #"""
                     set.seed(2)
                     boots <- replicate(5000, { i <- sample(nrow(survey), replace = TRUE)
                                                cor(survey$rumination[i], survey$anxiety[i]) })
-                    quantile(boots, c(0.025, 0.975))
-                    cor.test(survey$rumination, survey$anxiety)$conf.int
+                    boot_ci <- quantile(boots, c(0.025, 0.975))
+                    r_ci <- cor.test(survey$rumination, survey$anxiety)$conf.int
+                    boot_ci; r_ci
                     """#
                 ),
-                answer: "The two intervals are nearly identical (around .45–.60). With a large sample and a well-behaved statistic, the bootstrap reproduces the formula — its value is for statistics that have no simple formula."
+                answer: "The two intervals are nearly identical (around .45–.60). With a large sample and a well-behaved statistic, the bootstrap reproduces the formula — its value is for statistics that have no simple formula.",
+                selfCheck: SelfCheck(
+                    names: "`boot_ci` (your bootstrap 95% CI) and `r_ci` (the analytic one), each as [lower, upper]",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        # The analytic CI via Fisher's z: atanh(r) ± 1.96 / √(n − 3), transformed back with tanh.
+                        ref = pd.read_csv("survey.csv")
+                        r, n = ref["rumination"].corr(ref["anxiety"]), len(ref)
+                        fisher_ci = np.tanh(np.arctanh(r) + np.array([-1, 1]) * 1.959964 / np.sqrt(n - 3))
+                        check("Analytic 95% CI", r_ci, fisher_ci, tol=0.005)
+                        # Bootstrap CIs vary a little from run to run, so they only need to be close.
+                        check("Bootstrap CI is close to the analytic one", boot_ci, fisher_ci, tol=0.03,
+                              hint="Resample whole rows (both variables together), with replacement.")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      # The analytic CI via Fisher's z: atanh(r) ± 1.96 / √(n − 3), transformed back with tanh.
+                      ref <- read.csv("survey.csv")
+                      r <- cor(ref$rumination, ref$anxiety)
+                      fisher_ci <- tanh(atanh(r) + c(-1, 1) * qnorm(0.975) / sqrt(nrow(ref) - 3))
+                      check("Analytic 95% CI", r_ci, fisher_ci, tol = 0.005)
+                      # Bootstrap CIs vary a little from run to run, so they only need to be close.
+                      check("Bootstrap CI is close to the analytic one", boot_ci, fisher_ci, tol = 0.03,
+                            hint = "Resample whole rows (both variables together), with replacement.")
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -240,7 +276,67 @@ extension Curriculum {
             .exercise(Exercise(
                 title: "Find the N",
                 prompt: "Using the interaction simulation, find the smallest n (in steps of 50) that reaches 80% power for b_int = 0.15. Then try b_int = 0.10.",
-                answer: "For 0.15, power crosses .80 somewhere around n = 350. For 0.10 you need roughly twice as many — power scales with the **square** of the effect size."
+                solution: CodeSample(
+                    caption: "Solution",
+                    python: #"""
+                    def smallest_n(b_int, start, sims=1000):
+                        for n in range(start, 3001, 50):
+                            power = np.mean([significant_once(n, b_int, rng) for _ in range(sims)])
+                            if power >= 0.80:
+                                return n
+
+                    n_015 = smallest_n(0.15, start=200)
+                    n_010 = smallest_n(0.10, start=500)
+                    print(n_015, n_010)
+                    """#,
+                    r: #"""
+                    smallest_n <- function(b_int, start, sims = 1000) {
+                      for (n in seq(start, 3000, by = 50)) {
+                        if (mean(replicate(sims, significant_once(n, b_int))) >= 0.80) return(n)
+                      }
+                    }
+                    set.seed(7)
+                    n_015 <- smallest_n(0.15, start = 200)
+                    n_010 <- smallest_n(0.10, start = 500)
+                    c(n_015, n_010)
+                    """#
+                ),
+                answer: "For 0.15, power crosses .80 somewhere around n = 350. For 0.10 you need roughly twice as many — power scales with the **square** of the effect size.",
+                selfCheck: SelfCheck(
+                    names: "`n_015` and `n_010` — the smallest n with 80% power for b_int = 0.15 and 0.10",
+                    python: #"""
+                    from scipy import stats
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        # Formula check: n ≈ (z₀.₉₇₅ + z₀.₈₀)² / f² + k + 1, where f² = b² here (x, w, and the error
+                        # all have variance 1) and k = 3 predictors. Simulated answers land within about ±50.
+                        def formula_n(b):
+                            return (stats.norm.ppf(0.975) + stats.norm.ppf(0.80)) ** 2 / b ** 2 + 4
+
+                        print(f"formula: {formula_n(0.15):.0f} and {formula_n(0.10):.0f}")
+                        check("n for b_int = 0.15", n_015, formula_n(0.15), tol=0.2,
+                              hint="Use 1,000+ simulations per n so power estimates aren't too noisy.")
+                        check("n for b_int = 0.10", n_010, formula_n(0.10), tol=0.15)
+                        check("Smaller effect needs about (0.15 / 0.10)² = 2.25× the sample", n_010 / n_015, 2.25, tol=0.15)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      # Formula check: n ≈ (z₀.₉₇₅ + z₀.₈₀)² / f² + k + 1, where f² = b² here (x, w, and the error
+                      # all have variance 1) and k = 3 predictors. Simulated answers land within about ±50.
+                      formula_n <- function(b) (qnorm(0.975) + qnorm(0.80))^2 / b^2 + 4
+                      cat(sprintf("formula: %.0f and %.0f\n", formula_n(0.15), formula_n(0.10)))
+                      check("n for b_int = 0.15", n_015, formula_n(0.15), tol = 0.2,
+                            hint = "Use 1,000+ simulations per n so power estimates aren't too noisy.")
+                      check("n for b_int = 0.10", n_010, formula_n(0.10), tol = 0.15)
+                      check("Smaller effect needs about (0.15 / 0.10)² = 2.25× the sample", n_010 / n_015, 2.25, tol = 0.15)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -370,7 +466,7 @@ extension Curriculum {
                 pt(t_val, df = m$df.residual, lower.tail = FALSE)
                 """#
             )),
-            .keyPoint("Why ANCOVA beats change scores", "Analyzing post − pre assumes the pre-test predicts the post-test with a slope of exactly 1. ANCOVA *estimates* that slope from the data, so it's at least as precise — and usually more."),
+            .keyPoint("Why ANCOVA beats change scores", "Analyzing post − pre assumes the pre-test predicts the post-test with a slope of exactly 1. ANCOVA *estimates* that slope from the data, so in randomized studies it's at least as precise — and usually more (Vickers & Altman, 2001; Van Breukelen, 2006). In non-randomized comparisons the two can disagree, and neither is automatically right."),
             .caution("One-tailed tests are a commitment", "If the effect turns out in the *opposite* direction, a one-tailed test can't call it significant. Use them only when the direction was preregistered."),
             .exercise(Exercise(
                 title: "ANCOVA vs. post-only vs. change scores",
@@ -379,18 +475,65 @@ extension Curriculum {
                     caption: "Solution",
                     python: #"""
                     classroom["change"] = classroom["posttest"] - classroom["pretest"]
+                    ests, ses = [], []
                     for formula in ["posttest ~ C(method)", "change ~ C(method)", "posttest ~ C(method) + pretest"]:
                         fit = smf.ols(formula, data=classroom).fit()
+                        ests.append(fit.params[name])
+                        ses.append(fit.bse[name])
                         print(formula, round(fit.params[name], 2), round(fit.bse[name], 2))
                     """#,
                     r: #"""
                     classroom <- classroom |> mutate(change = posttest - pretest)
+                    ests <- c(); ses <- c()
                     for (f in c("posttest ~ method", "change ~ method", "posttest ~ method + pretest")) {
-                      print(c(f, round(coef(summary(lm(as.formula(f), data = classroom)))["methodactive", 1:2], 2)))
+                      row <- coef(summary(lm(as.formula(f), data = classroom)))["methodactive", ]
+                      ests <- c(ests, row[["Estimate"]])
+                      ses  <- c(ses, row[["Std. Error"]])
                     }
+                    round(rbind(ests, ses), 2)
                     """#
                 ),
-                answer: "All three estimates are around +4 points (0.4 SD), but ANCOVA has the smallest standard error. Change scores beat post-only here because pre and post correlate highly, yet still lose to ANCOVA."
+                answer: "All three estimates are around +4 points (0.4 SD), but ANCOVA has the smallest standard error. Change scores beat post-only here because pre and post correlate highly, yet still lose to ANCOVA.",
+                selfCheck: SelfCheck(
+                    names: "`ests` and `ses` — the active-vs-lecture estimate and its SE, in the order post-only, change score, ANCOVA",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    import statsmodels.formula.api as smf
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("classroom.csv")
+                        ref["active"] = (ref["method"] == "active").astype(int)
+                        ref["flipped"] = (ref["method"] == "flipped").astype(int)
+                        ref["change"] = ref["posttest"] - ref["pretest"]
+                        fits = [smf.ols(f, data=ref).fit() for f in
+                                ["posttest ~ active + flipped", "change ~ active + flipped", "posttest ~ active + flipped + pretest"]]
+                        check("Estimates: post-only, change, ANCOVA", ests, [f.params["active"] for f in fits], tol=0.001,
+                              hint="Lecture should be the reference group.")
+                        check("SEs: post-only, change, ANCOVA", ses, [f.bse["active"] for f in fits], tol=0.001)
+                        check("ANCOVA has the smallest SE", int(np.argmin(ses)), 2, tol=0)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("classroom.csv")
+                      ref$active  <- as.integer(ref$method == "active")
+                      ref$flipped <- as.integer(ref$method == "flipped")
+                      ref$change  <- ref$posttest - ref$pretest
+                      fits <- list(lm(posttest ~ active + flipped, ref), lm(change ~ active + flipped, ref),
+                                   lm(posttest ~ active + flipped + pretest, ref))
+                      check("Estimates: post-only, change, ANCOVA", ests, sapply(fits, function(f) coef(f)[["active"]]),
+                            tol = 0.001, hint = "Lecture should be the reference group.")
+                      check("SEs: post-only, change, ANCOVA", ses,
+                            sapply(fits, function(f) coef(summary(f))["active", "Std. Error"]), tol = 0.001)
+                      check("ANCOVA has the smallest SE", which.min(ses), 3, tol = 0)
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Randomization check",
@@ -399,15 +542,51 @@ extension Curriculum {
                     caption: "Solution",
                     python: #"""
                     import pingouin as pg
+                    pre_means = classroom.groupby("method", observed=True)["pretest"].mean()
                     print(classroom.groupby("method", observed=True)["pretest"].agg(["mean", "std", "count"]))
-                    print(pg.anova(data=classroom, dv="pretest", between="method"))
+                    aov = pg.anova(data=classroom, dv="pretest", between="method")
+                    p_pre = aov["p-unc"].iloc[0]
+                    print(aov)
                     """#,
                     r: #"""
-                    classroom |> group_by(method) |> summarise(mean = mean(pretest), sd = sd(pretest), n = n())
-                    summary(aov(pretest ~ method, data = classroom))
+                    pre_means <- classroom |> group_by(method) |> summarise(mean = mean(pretest), sd = sd(pretest), n = n())
+                    pre_means
+                    fit <- summary(aov(pretest ~ method, data = classroom))
+                    p_pre <- fit[[1]][["Pr(>F)"]][1]
+                    fit
                     """#
                 ),
-                answer: "The means are similar. With random assignment any baseline differences are chance by definition, so the check is descriptive — you adjust for the pre-test because it's prognostic, not because a test told you to."
+                answer: "The means are similar. With random assignment any baseline differences are chance by definition, so the check is descriptive — you adjust for the pre-test because it's prognostic, not because a test told you to.",
+                selfCheck: SelfCheck(
+                    names: "`pre_means` (mean pretest per method — in R, a `mean` column) and `p_pre` (the ANOVA p-value)",
+                    python: #"""
+                    import pandas as pd
+                    from scipy import stats
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("classroom.csv")
+                        for method in ["lecture", "active", "flipped"]:
+                            check(f"Mean pretest, {method}", pre_means[method], ref.loc[ref["method"] == method, "pretest"].mean())
+                        groups = [g["pretest"] for _, g in ref.groupby("method")]
+                        check("ANOVA p-value", p_pre, stats.f_oneway(*groups).pvalue, tol=0.001)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("classroom.csv")
+                      for (m in c("lecture", "active", "flipped")) {
+                        check(paste("Mean pretest,", m), with(pre_means, mean[method == m]),
+                              mean(ref$pretest[ref$method == m]))
+                      }
+                      check("ANOVA p-value", p_pre, oneway.test(pretest ~ method, data = ref, var.equal = TRUE)$p.value,
+                            tol = 0.001)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -556,7 +735,62 @@ extension Curriculum {
             .exercise(Exercise(
                 title: "Find the paradox",
                 prompt: "Compare the signs of the pooled, between-person, and within-person correlations. How would you describe the pattern in plain language?",
-                answer: "Between-person r is **positive** (people who usually work longer report higher wellbeing), while within-person r is **negative** (on days someone works more than usual, they feel worse). The pooled r lands somewhere in between, which is misleading about both."
+                solution: CodeSample(
+                    caption: "Solution",
+                    python: #"""
+                    r_pooled = diary["work_hours"].corr(diary["wellbeing"])
+                    r_between = means["work_hours"].corr(means["wellbeing"])
+                    r_within = pg.rm_corr(data=diary, x="work_hours", y="wellbeing", subject="participant")["r"].iloc[0]
+                    print(round(r_pooled, 2), round(r_between, 2), round(r_within, 2))
+                    """#,
+                    r: #"""
+                    r_pooled  <- cor(diary$work_hours, diary$wellbeing)
+                    r_between <- cor(means$work_hours, means$wellbeing)
+                    r_within  <- rmcorr(participant, work_hours, wellbeing, diary)$r
+                    round(c(pooled = r_pooled, between = r_between, within = r_within), 2)
+                    """#
+                ),
+                answer: "Between-person r is **positive** (people who usually work longer report higher wellbeing), while within-person r is **negative** (on days someone works more than usual, they feel worse). The pooled r lands somewhere in between, which is misleading about both.",
+                selfCheck: SelfCheck(
+                    names: "`r_pooled`, `r_between`, and `r_within`",
+                    python: #"""
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("diary.csv")
+                        person = ref.groupby("participant")[["work_hours", "wellbeing"]]
+                        # The repeated-measures correlation equals the correlation of person-mean-centered scores.
+                        centered = ref[["work_hours", "wellbeing"]] - person.transform("mean")
+                        check("Pooled r", r_pooled, ref["work_hours"].corr(ref["wellbeing"]))
+                        check("Between-person r", r_between, person.mean().corr().iloc[0, 1],
+                              hint="Correlate the 100 person means, not the 1,400 days.")
+                        check("Within-person r", r_within, centered["work_hours"].corr(centered["wellbeing"]),
+                              hint="Use a repeated-measures correlation (pg.rm_corr).")
+                        check("Between-person r is positive", r_between > 0, True)
+                        check("Within-person r is negative", r_within < 0, True)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("diary.csv")
+                      pm <- aggregate(cbind(work_hours, wellbeing) ~ participant, data = ref, FUN = mean)
+                      # The repeated-measures correlation equals the correlation of person-mean-centered scores.
+                      centered_x <- ref$work_hours - ave(ref$work_hours, ref$participant)
+                      centered_y <- ref$wellbeing - ave(ref$wellbeing, ref$participant)
+                      check("Pooled r", r_pooled, cor(ref$work_hours, ref$wellbeing))
+                      check("Between-person r", r_between, cor(pm$work_hours, pm$wellbeing),
+                            hint = "Correlate the 100 person means, not the 1,400 days.")
+                      check("Within-person r", r_within, cor(centered_x, centered_y),
+                            hint = "Use a repeated-measures correlation (rmcorr).")
+                      check("Between-person r is positive", r_between > 0, TRUE)
+                      check("Within-person r is negative", r_within < 0, TRUE)
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Does personality change the daily link?",
@@ -568,15 +802,57 @@ extension Curriculum {
                     diary["consc_c"] = diary["conscientiousness"] - diary.groupby("participant")["conscientiousness"].first().mean()
                     m2 = smf.mixedlm("wellbeing ~ hours_within * consc_c + hours_between", data=diary,
                                      groups=diary["participant"], re_formula="~hours_within").fit()
+                    b_cross = m2.params["hours_within:consc_c"]
                     print(m2.params[["hours_within", "hours_within:consc_c"]])
                     """#,
                     r: #"""
                     diary <- diary |> mutate(consc_c = conscientiousness - mean(conscientiousness))
-                    summary(lmer(wellbeing ~ hours_within * consc_c + hours_between +
-                                   (1 + hours_within | participant), data = diary))
+                    m2 <- lmer(wellbeing ~ hours_within * consc_c + hours_between +
+                                 (1 + hours_within | participant), data = diary)
+                    b_cross <- fixef(m2)[["hours_within:consc_c"]]
+                    summary(m2)
                     """#
                 ),
-                answer: "The interaction is **negative**: for more conscientious people, extra hours are followed by an even bigger dip in wellbeing. Cross-level interactions are how multilevel models test whether a person-level variable moderates a within-person relationship."
+                answer: "The interaction is **negative**: for more conscientious people, extra hours are followed by an even bigger dip in wellbeing. Cross-level interactions are how multilevel models test whether a person-level variable moderates a within-person relationship.",
+                selfCheck: SelfCheck(
+                    names: "`b_cross` — the `hours_within:consc_c` coefficient",
+                    python: #"""
+                    import pandas as pd
+                    import statsmodels.formula.api as smf
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("diary.csv")
+                        ref["hours_mean"] = ref.groupby("participant")["work_hours"].transform("mean")
+                        ref["hours_within"] = ref["work_hours"] - ref["hours_mean"]
+                        ref["hours_between"] = ref["hours_mean"] - ref["hours_mean"].mean()
+                        ref["consc_c"] = ref["conscientiousness"] - ref["conscientiousness"].mean()
+                        fit = smf.mixedlm("wellbeing ~ hours_within * consc_c + hours_between", data=ref,
+                                          groups=ref["participant"], re_formula="~hours_within").fit()
+                        check("Cross-level interaction", b_cross, fit.params["hours_within:consc_c"], tol=0.01,
+                              hint="Use person-mean-centered hours (hours_within) and centered conscientiousness.")
+                        check("The interaction is negative", b_cross < 0, True)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+                    library(lme4)
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("diary.csv")
+                      ref$hours_mean    <- ave(ref$work_hours, ref$participant)
+                      ref$hours_within  <- ref$work_hours - ref$hours_mean
+                      ref$hours_between <- ref$hours_mean - mean(ref$hours_mean)
+                      ref$consc_c       <- ref$conscientiousness - mean(ref$conscientiousness)
+                      fit <- lmer(wellbeing ~ hours_within * consc_c + hours_between + (1 + hours_within | participant),
+                                  data = ref)
+                      check("Cross-level interaction", b_cross, fixef(fit)[["hours_within:consc_c"]], tol = 0.01,
+                            hint = "Use person-mean-centered hours (hours_within) and centered conscientiousness.")
+                      check("The interaction is negative", b_cross < 0, TRUE)
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Plot both relationships",
@@ -709,15 +985,46 @@ extension Curriculum {
                     caption: "Solution",
                     python: #"""
                     gee0 = smf.gee("correct ~ 1", groups="participant", data=judgments, family=sm.families.Binomial()).fit()
-                    print(1 / (1 + np.exp(-gee0.params["Intercept"])), gee0.pvalues["Intercept"])
+                    acc = 1 / (1 + np.exp(-gee0.params["Intercept"]))
+                    print(acc, gee0.pvalues["Intercept"])
                     """#,
                     r: #"""
                     m0 <- glmer(correct ~ 1 + (1 | participant) + (1 | item), data = judgments, family = binomial)
                     summary(m0)$coefficients
-                    plogis(fixef(m0))
+                    acc <- plogis(fixef(m0)[["(Intercept)"]])
+                    acc
                     """#
                 ),
-                answer: "Accuracy is around 75–80%, and the intercept is far above 0 (p < .001), so performance is clearly above chance."
+                answer: "Accuracy is around 75–80%, and the intercept is far above 0 (p < .001), so performance is clearly above chance.",
+                selfCheck: SelfCheck(
+                    names: "`acc` — the intercept converted to a probability",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        # With an intercept-only GEE, the estimate is simply the overall proportion correct.
+                        ref = pd.read_csv("judgments.csv")
+                        check("Accuracy (a probability, not log-odds)", acc, ref["correct"].mean(), tol=0.001,
+                              hint="Convert log-odds with 1 / (1 + exp(−b)).")
+                        check("Accuracy is above chance (.50)", acc > 0.5, True)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+                    library(lme4)
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("judgments.csv")
+                      fit <- glmer(correct ~ 1 + (1 | participant) + (1 | item), data = ref, family = binomial)
+                      check("Accuracy for a typical participant and item", acc, plogis(fixef(fit)[[1]]), tol = 0.001,
+                            hint = "Convert log-odds with plogis().")
+                      check("Accuracy is above chance (.50)", acc > 0.5, TRUE)
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Clustering and standard errors",
@@ -726,14 +1033,52 @@ extension Curriculum {
                     caption: "Solution",
                     python: #"""
                     plain = smf.logit("correct ~ C(structure, Treatment('simple'))", data=judgments).fit(disp=False)
-                    print(plain.bse, gee.bse)
+                    term = "C(structure, Treatment('simple'))[T.complex]"
+                    se_plain, se_clustered = plain.bse[term], gee.bse[term]
+                    print(se_plain, se_clustered)
                     """#,
                     r: #"""
                     plain <- glm(correct ~ structure, data = judgments, family = binomial)
+                    se_plain <- coef(summary(plain))["structurecomplex", "Std. Error"]
+                    se_clustered <- coef(summary(m))["structurecomplex", "Std. Error"]
                     rbind(plain = coef(summary(plain))[2, 1:2], mixed = coef(summary(m))[2, 1:2])
                     """#
                 ),
-                answer: "The plain model's standard errors are smaller (it treats all 1,280 trials as independent), and its estimate is slightly closer to 0 than the mixed model's conditional estimate."
+                answer: "The plain model's standard errors are smaller (it treats all 1,280 trials as independent), and its estimate is slightly closer to 0 than the mixed model's conditional estimate.",
+                selfCheck: SelfCheck(
+                    names: "`se_plain` and `se_clustered` — the SE of the complex-vs-simple effect in the plain model and in the GEE (Python) or mixed model (R)",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    import statsmodels.api as sm
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("judgments.csv")
+                        X = sm.add_constant((ref["structure"] == "complex").astype(float).rename("complex"))
+                        plain_ref = sm.Logit(ref["correct"], X).fit(disp=False)
+                        gee_ref = sm.GEE(ref["correct"], X, groups=ref["participant"], family=sm.families.Binomial()).fit()
+                        check("SE, plain logistic", se_plain, plain_ref.bse["complex"], tol=0.001)
+                        check("SE, clustered (GEE)", se_clustered, gee_ref.bse["complex"], tol=0.001,
+                              hint="Use participants as the GEE groups.")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+                    library(lme4)
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("judgments.csv")
+                      ref$complex <- as.integer(ref$structure == "complex")
+                      plain_ref <- glm(correct ~ complex, data = ref, family = binomial)
+                      mixed_ref <- glmer(correct ~ complex + (1 | participant) + (1 | item), data = ref, family = binomial)
+                      check("SE, plain logistic", se_plain, coef(summary(plain_ref))["complex", "Std. Error"], tol = 0.001)
+                      check("SE, mixed model", se_clustered, coef(summary(mixed_ref))["complex", "Std. Error"], tol = 0.001,
+                            hint = "Include random intercepts for both participants and items.")
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -831,7 +1176,7 @@ extension Curriculum {
                 Term("Exact / adjacent agreement", "Share of cases where raters give the same score / scores within one point."),
                 Term("Cohen's κ", "Chance-corrected agreement for two raters."),
                 Term("Weighted κ", "κ for ordered categories, with partial credit for near-misses."),
-                Term("Krippendorff's α", "Chance-corrected agreement for any number of raters, missing data, and any measurement level. ≥ .80 is commonly treated as reliable; .667–.80 as tentative."),
+                Term("Krippendorff's α", "Chance-corrected agreement for any number of raters, missing data, and any measurement level. Krippendorff (2004) recommends α ≥ .80, with .667–.80 acceptable only for tentative conclusions."),
                 Term("ICC (absolute agreement)", "Reliability that treats systematic rater differences as error."),
                 Term("ICC (consistency)", "Reliability that ignores constant differences between raters."),
                 Term("Test–retest reliability", "Agreement of the same rater (or measure) with itself over time."),
@@ -844,13 +1189,63 @@ extension Curriculum {
                 solution: CodeSample(
                     caption: "Solution",
                     python: #"""
-                    print((essays["rater_b"] - essays["rater_a"]).mean())
+                    icc = pg.intraclass_corr(data=long, targets="essay", raters="rater", ratings="score").set_index("Type")["ICC"]
+                    icc_agree, icc_cons = icc["ICC2"], icc["ICC3"]       # two-way: absolute agreement, consistency
+                    mean_diff = (essays["rater_b"] - essays["rater_a"]).mean()
+                    print(icc_agree, icc_cons, mean_diff)
                     """#,
                     r: #"""
-                    mean(essays$rater_b - essays$rater_a)
+                    icc_agree <- icc(scores, model = "twoway", type = "agreement", unit = "single")$value
+                    icc_cons  <- icc(scores, model = "twoway", type = "consistency", unit = "single")$value
+                    mean_diff <- mean(essays$rater_b - essays$rater_a)
+                    c(icc_agree, icc_cons, mean_diff)
                     """#
                 ),
-                answer: "Rater B scores about 0.3 points higher on average. That systematic difference lowers the absolute-agreement ICC but not the consistency ICC. If one rater's scores might replace the other's, use absolute agreement."
+                answer: "Rater B scores about 0.3 points higher on average. That systematic difference lowers the absolute-agreement ICC but not the consistency ICC. If one rater's scores might replace the other's, use absolute agreement.",
+                selfCheck: SelfCheck(
+                    names: "`icc_agree` and `icc_cons` (two-way, single-rater ICCs) and `mean_diff` (mean of B − A)",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        # Two-way ANOVA mean squares: rows = essays (targets), columns = raters.
+                        Y = pd.read_csv("essays.csv")[["rater_a", "rater_b"]].to_numpy(float)
+                        n, k = Y.shape
+                        gm = Y.mean()
+                        ms_rows = k * ((Y.mean(axis=1) - gm) ** 2).sum() / (n - 1)
+                        ms_cols = n * ((Y.mean(axis=0) - gm) ** 2).sum() / (k - 1)
+                        ss_err = ((Y - gm) ** 2).sum() - ms_rows * (n - 1) - ms_cols * (k - 1)
+                        ms_err = ss_err / ((n - 1) * (k - 1))
+                        check("ICC, absolute agreement", icc_agree,
+                              (ms_rows - ms_err) / (ms_rows + (k - 1) * ms_err + k * (ms_cols - ms_err) / n), tol=0.002,
+                              hint="Absolute agreement is pingouin's ICC2 (irr: type = 'agreement').")
+                        check("ICC, consistency", icc_cons, (ms_rows - ms_err) / (ms_rows + (k - 1) * ms_err), tol=0.002,
+                              hint="Consistency is pingouin's ICC3 (irr: type = 'consistency').")
+                        check("Mean of B − A", mean_diff, Y[:, 1].mean() - Y[:, 0].mean())
+                        check("Agreement ICC is lower than consistency ICC", icc_agree < icc_cons, True)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      # Two-way ANOVA mean squares: rows = essays (targets), columns = raters.
+                      Y <- as.matrix(read.csv("essays.csv")[, c("rater_a", "rater_b")])
+                      n <- nrow(Y); k <- ncol(Y); gm <- mean(Y)
+                      ms_rows <- k * sum((rowMeans(Y) - gm)^2) / (n - 1)
+                      ms_cols <- n * sum((colMeans(Y) - gm)^2) / (k - 1)
+                      ms_err  <- (sum((Y - gm)^2) - ms_rows * (n - 1) - ms_cols * (k - 1)) / ((n - 1) * (k - 1))
+                      check("ICC, absolute agreement", icc_agree,
+                            (ms_rows - ms_err) / (ms_rows + (k - 1) * ms_err + k * (ms_cols - ms_err) / n), tol = 0.002)
+                      check("ICC, consistency", icc_cons, (ms_rows - ms_err) / (ms_rows + (k - 1) * ms_err), tol = 0.002)
+                      check("Mean of B − A", mean_diff, mean(Y[, 2]) - mean(Y[, 1]))
+                      check("Agreement ICC is lower than consistency ICC", icc_agree < icc_cons, TRUE)
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Test–retest reliability",
@@ -858,17 +1253,72 @@ extension Curriculum {
                 solution: CodeSample(
                     caption: "Solution",
                     python: #"""
-                    print(cohen_kappa_score(essays["rater_a"], essays["rater_a_retest"], weights="quadratic"))
+                    wkappa = cohen_kappa_score(essays["rater_a"], essays["rater_a_retest"], weights="quadratic")
                     retest = essays.melt(id_vars="essay", value_vars=["rater_a", "rater_a_retest"],
                                          var_name="occasion", value_name="score")
-                    print(pg.intraclass_corr(data=retest, targets="essay", raters="occasion", ratings="score"))
+                    icc_retest = pg.intraclass_corr(data=retest, targets="essay", raters="occasion",
+                                                    ratings="score").set_index("Type").loc["ICC2", "ICC"]
+                    print(wkappa, icc_retest)
                     """#,
                     r: #"""
-                    kappa2(essays[, c("rater_a", "rater_a_retest")], weight = "squared")
-                    icc(essays[, c("rater_a", "rater_a_retest")], model = "twoway", type = "agreement")
+                    wkappa <- kappa2(essays[, c("rater_a", "rater_a_retest")], weight = "squared")$value
+                    icc_retest <- icc(essays[, c("rater_a", "rater_a_retest")], model = "twoway", type = "agreement")$value
+                    c(wkappa, icc_retest)
                     """#
                 ),
-                answer: "High (around .7–.8): the rater is fairly stable over time. Test–retest reliability is the right check when you need scores to be repeatable, not just consistent across raters."
+                answer: "High (around .7–.8): the rater is fairly stable over time. Test–retest reliability is the right check when you need scores to be repeatable, not just consistent across raters.",
+                selfCheck: SelfCheck(
+                    names: "`wkappa` (quadratic-weighted κ) and `icc_retest` (two-way, absolute-agreement ICC)",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("essays.csv")
+                        a, b = ref["rater_a"].to_numpy(), ref["rater_a_retest"].to_numpy()
+                        # Weighted κ = 1 − Σ w·observed / Σ w·expected, with weights (i − j)² between categories.
+                        cats = np.unique(np.r_[a, b])
+                        obs = np.array([[np.mean((a == i) & (b == j)) for j in cats] for i in cats])
+                        exp = np.outer(obs.sum(axis=1), obs.sum(axis=0))
+                        w = np.subtract.outer(np.arange(len(cats)), np.arange(len(cats))) ** 2
+                        check("Weighted κ", wkappa, 1 - (w * obs).sum() / (w * exp).sum(), tol=0.002,
+                              hint="Use quadratic weights.")
+                        # Absolute-agreement ICC from two-way ANOVA mean squares
+                        Y = np.c_[a, b].astype(float)
+                        n, k = Y.shape
+                        gm = Y.mean()
+                        ms_rows = k * ((Y.mean(axis=1) - gm) ** 2).sum() / (n - 1)
+                        ms_cols = n * ((Y.mean(axis=0) - gm) ** 2).sum() / (k - 1)
+                        ms_err = (((Y - gm) ** 2).sum() - ms_rows * (n - 1) - ms_cols * (k - 1)) / ((n - 1) * (k - 1))
+                        check("ICC, absolute agreement", icc_retest,
+                              (ms_rows - ms_err) / (ms_rows + (k - 1) * ms_err + k * (ms_cols - ms_err) / n), tol=0.002)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("essays.csv")
+                      a <- ref$rater_a; b <- ref$rater_a_retest
+                      # Weighted κ = 1 − Σ w·observed / Σ w·expected, with weights (i − j)² between categories.
+                      cats <- sort(unique(c(a, b)))
+                      obs <- table(factor(a, cats), factor(b, cats)) / length(a)
+                      expd <- outer(rowSums(obs), colSums(obs))
+                      w <- outer(seq_along(cats), seq_along(cats), function(i, j) (i - j)^2)
+                      check("Weighted κ", wkappa, 1 - sum(w * obs) / sum(w * expd), tol = 0.002,
+                            hint = "Use squared (quadratic) weights.")
+                      # Absolute-agreement ICC from two-way ANOVA mean squares
+                      Y <- cbind(a, b); n <- nrow(Y); k <- 2; gm <- mean(Y)
+                      ms_rows <- k * sum((rowMeans(Y) - gm)^2) / (n - 1)
+                      ms_cols <- n * sum((colMeans(Y) - gm)^2) / (k - 1)
+                      ms_err  <- (sum((Y - gm)^2) - ms_rows * (n - 1) - ms_cols * (k - 1)) / ((n - 1) * (k - 1))
+                      check("ICC, absolute agreement", icc_retest,
+                            (ms_rows - ms_err) / (ms_rows + (k - 1) * ms_err + k * (ms_cols - ms_err) / n), tol = 0.002)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [

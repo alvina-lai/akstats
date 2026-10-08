@@ -250,7 +250,7 @@ extension Curriculum {
                     "“Models were estimated in Mplus 8.10 with 500 initial and 100 final-stage random starts; the best loglikelihood was replicated for all models. Fit indices (BIC, aBIC, LMR, BLRT) favored three classes. Distal outcomes were compared across classes with the BCH method.”"),
         ],
 
-        // MARK: Unit 12 · Capstone
+        // MARK: Unit 13 · Capstone
 
         "which-test": [
             idea("Choosing an analysis is a short series of questions",

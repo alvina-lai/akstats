@@ -149,14 +149,50 @@ extension Curriculum {
                 solution: CodeSample(
                     caption: "Solution",
                     python: #"""
-                    print(pd.crosstab(lpa["profile"], lpa["true_profile"]))
+                    est = lpa["profile"]
+                    print(pd.crosstab(est, lpa["true_profile"]))
                     """#,
                     r: #"""
-                    est <- get_data(best)        # adds Class and CPROB columns
-                    table(estimated = est$Class, true = lpa$true_profile)
+                    est <- get_data(best)$Class   # get_data() adds Class and CPROB columns
+                    table(estimated = est, true = lpa$true_profile)
                     """#
                 ),
-                answer: "Nearly everyone lands in the right profile (the labels may be permuted). The profiles are well separated — about 1.5 SD apart on several indicators — so entropy is high."
+                answer: "Nearly everyone lands in the right profile (the labels may be permuted). The profiles are well separated — about 1.5 SD apart on several indicators — so entropy is high.",
+                selfCheck: SelfCheck(
+                    names: "`est` — each person's most likely profile (1, 2, or 3), in the original row order",
+                    python: #"""
+                    from itertools import permutations
+                    import numpy as np
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        truth = pd.read_csv("profiles.csv")["true_profile"].to_numpy()
+                        est_arr = np.asarray(est).astype(int)
+                        check("One profile per person", len(est_arr), len(truth), tol=0)
+                        # Profile numbers are arbitrary, so score the best matching of labels.
+                        agreement = max((np.array(p)[est_arr - 1] == truth).mean() for p in permutations([1, 2, 3]))
+                        print(f"Classified correctly: {agreement:.0%}")
+                        check("At least 90% classified correctly", agreement >= 0.90, True,
+                              hint="Fit 3 profiles with many random starts (n_init) on the four indicators only.")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      truth <- read.csv("profiles.csv")$true_profile
+                      check("One profile per person", length(est), length(truth), tol = 0)
+                      # Profile numbers are arbitrary, so score the best matching of labels.
+                      perms <- list(c(1, 2, 3), c(1, 3, 2), c(2, 1, 3), c(2, 3, 1), c(3, 1, 2), c(3, 2, 1))
+                      agreement <- max(sapply(perms, function(p) mean(p[est] == truth)))
+                      cat(sprintf("Classified correctly: %.0f%%\n", 100 * agreement))
+                      check("At least 90% classified correctly", agreement >= 0.90, TRUE,
+                            hint = "Fit 3 profiles on the four indicators only.")
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Plot the profile means",
@@ -195,16 +231,47 @@ extension Curriculum {
                     caption: "Solution",
                     python: #"""
                     import pingouin as pg
-                    print(lpa.groupby("profile")["burnout"].mean().round(2))
+                    burnout_means = lpa.groupby("profile")["burnout"].mean()
+                    print(burnout_means.round(2))
                     print(pg.anova(data=lpa, dv="burnout", between="profile"))
                     """#,
                     r: #"""
-                    est <- get_data(best) |> mutate(burnout = lpa$burnout)
-                    est |> group_by(Class) |> summarise(mean = mean(burnout))
-                    summary(aov(burnout ~ factor(Class), data = est))
+                    dat <- get_data(best) |> mutate(burnout = lpa$burnout)
+                    burnout_means <- dat |> group_by(Class) |> summarise(mean = mean(burnout))
+                    burnout_means
+                    summary(aov(burnout ~ factor(Class), data = dat))
                     """#
                 ),
-                answer: "Burnout is lowest in the thriving profile and highest in the struggling profile. Assigning people to their most likely profile ignores classification uncertainty, which biases comparisons when entropy is lower. Mplus's BCH and DCON methods (next lesson) correct for this."
+                answer: "Burnout is lowest in the thriving profile and highest in the struggling profile. Assigning people to their most likely profile ignores classification uncertainty, which biases comparisons when entropy is lower. Mplus's BCH and DCON methods (next lesson) correct for this.",
+                selfCheck: SelfCheck(
+                    names: "`burnout_means` — mean burnout in each estimated profile (in R, a `mean` column)",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        # Compare with the true profiles' means. Sorting removes the arbitrary profile numbering.
+                        truth = pd.read_csv("profiles.csv").groupby("true_profile")["burnout"].mean()
+                        check("Burnout means, lowest to highest (vs. the true profiles)",
+                              np.sort(np.asarray(burnout_means)), np.sort(truth.to_numpy()), tol=0.05,
+                              hint="Group burnout by your estimated profile, not by true_profile.")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      # Compare with the true profiles' means. Sorting removes the arbitrary profile numbering.
+                      ref <- read.csv("profiles.csv")
+                      truth <- tapply(ref$burnout, ref$true_profile, mean)
+                      check("Burnout means, lowest to highest (vs. the true profiles)",
+                            sort(burnout_means$mean), sort(as.vector(truth)), tol = 0.05,
+                            hint = "Group burnout by your estimated profile, not by true_profile.")
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -343,7 +410,59 @@ extension Curriculum {
             .exercise(Exercise(
                 title: "Run the enumeration",
                 prompt: "If you have Mplus, run the R loop above for 1–6 profiles. Otherwise, build the same table with tidyLPA's `get_fit()` or sklearn's BIC. Which K does each criterion favor?",
-                answer: "BIC, aBIC, LMR, and BLRT should all point to **3 profiles** in the generated data, with entropy above .85. (Two extra profiles may improve LL slightly but are penalized by BIC.)"
+                solution: CodeSample(
+                    caption: "Solution (without Mplus)",
+                    python: #"""
+                    import pandas as pd
+                    from sklearn.mixture import GaussianMixture
+
+                    lpa = pd.read_csv("profiles.csv")
+                    X = lpa[["wellbeing", "stress", "support", "sleep"]].to_numpy()
+                    bic = pd.Series({k: GaussianMixture(n_components=k, covariance_type="diag", n_init=20,
+                                                        random_state=1).fit(X).bic(X)
+                                     for k in range(1, 7)}, name="BIC")
+                    print(bic.round(1), "\nlowest BIC at K =", bic.idxmin())
+                    """#,
+                    r: #"""
+                    library(tidyverse)
+                    library(tidyLPA)
+
+                    indicators <- read_csv("profiles.csv") |> dplyr::select(wellbeing, stress, support, sleep)
+                    fit_table <- estimate_profiles(indicators, 1:6, variances = "equal", covariances = "zero") |>
+                      get_fit()
+                    bic <- fit_table$BIC
+                    fit_table[, c("Classes", "BIC", "Entropy")]
+                    """#
+                ),
+                answer: "BIC, aBIC, LMR, and BLRT should all point to **3 profiles** in the generated data, with entropy above .85. (Two extra profiles may improve LL slightly but are penalized by BIC.)",
+                selfCheck: SelfCheck(
+                    names: "`bic` — the six BIC values for K = 1, 2, …, 6, in that order",
+                    python: #"""
+                    import numpy as np
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        # e.g. bic = pd.Series(bics) from the LPA lesson's enumeration loop
+                        b = np.asarray(list(bic.values()) if isinstance(bic, dict) else bic, dtype=float)
+                        check("Six BIC values", len(b), 6, tol=0)
+                        check("BIC is lowest at K = 3", int(np.argmin(b)) + 1, 3, tol=0,
+                              hint="Use the same covariance structure for every K, with several random starts.")
+                        check("BIC drops sharply from K = 1 to K = 3", bool(b[0] > b[1] > b[2]), True)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      # e.g. bic <- get_fit(fits)$BIC from tidyLPA, or SummaryTable(fits)$BIC from Mplus
+                      check("Six BIC values", length(bic), 6, tol = 0)
+                      check("BIC is lowest at K = 3", which.min(bic), 3, tol = 0,
+                            hint = "Use the same variance structure for every K.")
+                      check("BIC drops sharply from K = 1 to K = 3", bic[1] > bic[2] && bic[2] > bic[3], TRUE)
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "LCA in Mplus",

@@ -248,18 +248,45 @@ extension Curriculum {
                     import pandas as pd
 
                     df = pd.read_csv("survey.csv")
-                    print(df["region"].value_counts())
-                    print(df.groupby("region")["anxiety"].mean().round(2))
+                    counts = df["region"].value_counts()
+                    means = df.groupby("region")["anxiety"].mean()
+                    print(counts)
+                    print(means.round(2))
                     """#,
                     r: #"""
                     library(tidyverse)
 
                     df <- read_csv("survey.csv")
-                    count(df, region)
-                    df |> group_by(region) |> summarise(mean_anxiety = mean(anxiety))
+                    counts <- count(df, region)
+                    means <- df |> group_by(region) |> summarise(mean_anxiety = mean(anxiety))
+                    counts
+                    means
                     """#
                 ),
-                answer: "About 60% of participants are urban and 40% rural; the two groups have similar mean anxiety near the middle of the 1–7 scale."
+                answer: "About 60% of participants are urban and 40% rural; the two groups have similar mean anxiety near the middle of the 1–7 scale.",
+                selfCheck: SelfCheck(
+                    names: "`counts` (participants per region) and `means` (mean anxiety per region — in R, a `mean_anxiety` column)",
+                    python: #"""
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("survey.csv")
+                        check("Participants per region", counts.sort_index(), ref["region"].value_counts().sort_index())
+                        check("Mean anxiety per region", means.sort_index(), ref.groupby("region")["anxiety"].mean())
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("survey.csv")
+                      check("Participants per region", counts$n, as.vector(table(ref$region)))
+                      check("Mean anxiety per region", means$mean_anxiety, tapply(ref$anxiety, ref$region, mean))
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Write a function",
@@ -281,7 +308,29 @@ extension Curriculum {
                     percent(37, 150)   # 24.7
                     """#
                 ),
-                answer: "`percent(37, 150)` returns **24.7**."
+                answer: "`percent(37, 150)` returns **24.7**.",
+                selfCheck: SelfCheck(
+                    names: "a function called `percent`",
+                    python: #"""
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        check("percent(37, 150)", percent(37, 150), 24.7, tol=1e-9)
+                        check("percent(1, 3)", percent(1, 3), 33.3, tol=1e-9, hint="Round to one decimal place.")
+                        check("percent(150, 150)", percent(150, 150), 100, tol=1e-9)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      check("percent(37, 150)", percent(37, 150), 24.7, tol = 1e-9)
+                      check("percent(1, 3)", percent(1, 3), 33.3, tol = 1e-9, hint = "Round to one decimal place.")
+                      check("percent(150, 150)", percent(150, 150), 100, tol = 1e-9)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -382,17 +431,49 @@ extension Curriculum {
 
                     df = pd.read_csv("survey.csv")
                     young = df[(df["age"] >= 18) & (df["age"] <= 29)]
-                    print(len(young), young["rumination"].mean(), young["rumination"].std())
+                    m, s = young["rumination"].mean(), young["rumination"].std()
+                    print(len(young), m, s)
                     """#,
                     r: #"""
                     library(tidyverse)
 
-                    read_csv("survey.csv") |>
-                      filter(age >= 18, age <= 29) |>
-                      summarise(n = n(), mean = mean(rumination), sd = sd(rumination))
+                    young <- read_csv("survey.csv") |> filter(age >= 18, age <= 29)
+                    m <- mean(young$rumination)
+                    s <- sd(young$rumination)
+                    c(n = nrow(young), mean = m, sd = s)
                     """#
                 ),
-                answer: "About a fifth of the sample is aged 18–29 (ages are spread evenly from 18 to 75). The mean rumination is close to the scale midpoint of 4, with an SD around 1."
+                answer: "About a fifth of the sample is aged 18–29 (ages are spread evenly from 18 to 75). The mean rumination is close to the scale midpoint of 4, with an SD around 1.",
+                selfCheck: SelfCheck(
+                    names: "`young` (the filtered rows), `m` (their mean rumination), and `s` (its SD)",
+                    python: #"""
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("survey.csv")
+                        ref_young = ref[ref["age"].between(18, 29)]
+                        check("Participants aged 18–29", len(young), len(ref_young), tol=0,
+                              hint="Both ends are inclusive: 18 <= age <= 29.")
+                        check("Mean rumination", m, ref_young["rumination"].mean())
+                        check("SD of rumination", s, ref_young["rumination"].std(), tol=0.001,
+                              hint="Use the sample SD (divide by n − 1): pandas .std(), not np.std().")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("survey.csv")
+                      ref_young <- subset(ref, age >= 18 & age <= 29)
+                      check("Participants aged 18–29", nrow(young), nrow(ref_young), tol = 0,
+                            hint = "Both ends are inclusive: 18 <= age <= 29.")
+                      check("Mean rumination", m, mean(ref_young$rumination))
+                      check("SD of rumination", s, sd(ref_young$rumination), tol = 0.001)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -411,17 +492,19 @@ extension Curriculum {
         summary: "Generate realistic test data with built-in answers to check yourself against.",
         minutes: 12,
         blocks: [
-            .text("Most lessons from Unit 3 onward use simulated datasets. Because *we* choose the true effects when generating the data, you can check whether your analysis recovers them — the best way to learn what a method actually does. Two scripts create everything; run both once, in the same folder."),
+            .text("Most lessons from Unit 3 onward use simulated datasets. Because *we* choose the true effects when generating the data, you can check whether your analysis recovers them — the best way to learn what a method actually does. Four scripts create everything; run each once, in the same folder."),
+            .keyPoint("Or download them", "Every file these scripts create is also in the app: open **Practice data** in the sidebar to preview each dataset, check its columns, and download it as a CSV — or download them all at once as a ZIP or a single Excel workbook. Running the scripts yourself is still worth doing once: it's how you'd make data like this for your own projects."),
             .steps("How to use them", [
-                "In your VS Code project folder, create `generate_data.py` (or `generate_data.R`) and `generate_more_data.py` (or `.R`).",
+                "In your VS Code project folder, create `generate_data.py`, `generate_more_data.py`, `generate_extra_data.py`, and `generate_simulations.py` (or the `.R` versions).",
                 "Paste in the code below and run each whole file (▷ in Python, **Cmd/Ctrl + Shift + S** in R).",
-                "Eight CSV files appear in the Explorer sidebar.",
+                "Thirty CSV files appear in the Explorer sidebar.",
+                "Save the `selfcheck.py` / `selfcheck.R` helper (below) in the same folder — the exercises' self-checks use it.",
                 "Create a new `analysis.py` / `analysis.R` in the same folder for each lesson's code.",
             ]),
             .code(CodeSample(
-                caption: "generate_data — survey.csv, diary.csv, classroom.csv, essays.csv",
+                caption: "generate_data — survey, diary, classroom, essays, and Stroop data",
                 python: #"""
-                # generate_data.py — creates survey.csv, diary.csv, classroom.csv, essays.csv
+                # generate_data.py — creates survey.csv, diary.csv, classroom.csv, essays.csv, stroop_trials.csv, stroop.csv
                 import numpy as np
                 import pandas as pd
 
@@ -520,10 +603,36 @@ extension Curriculum {
                     "rater_a_retest": score(0.0),     # rater A again, two weeks later
                 }).to_csv("essays.csv", index=False)
 
-                print("Saved survey.csv, diary.csv, classroom.csv, essays.csv")
+                # ---------- stroop_trials.csv and stroop.csv: a Stroop task ----------
+                n_s, n_items = 60, 24
+                person = rng.normal(0, 0.15, n_s)                 # some people respond faster overall
+                person_effect = rng.normal(0, 0.03, n_s)          # and show a bigger or smaller Stroop effect
+                item_effect = rng.normal(0, 0.05, n_items)        # some color words are harder
+                rows = []
+                for p in range(n_s):
+                    for i in range(n_items):
+                        for condition in ["congruent", "incongruent"]:
+                            log_rt = (6.3 + person[p] + item_effect[i]
+                                      + (0.08 + person_effect[p]) * (condition == "incongruent") + rng.normal(0, 0.25))
+                            rows.append({"participant": p + 1, "item": i + 1, "condition": condition,
+                                         "rt": int(round(np.exp(log_rt)))})
+                trials = pd.DataFrame(rows)
+                trials.to_csv("stroop_trials.csv", index=False)
+
+                # One row per participant: mean RT in each condition, plus age and an attention check
+                means = trials.pivot_table(index="participant", columns="condition", values="rt", aggfunc="mean")
+                pd.DataFrame({
+                    "participant": means.index,
+                    "age": rng.integers(16, 41, n_s),                 # a few are under 18
+                    "attention_check": np.where(rng.random(n_s) < 0.9, "pass", "fail"),
+                    "rt_congruent": means["congruent"].round(1).to_numpy(),
+                    "rt_incongruent": means["incongruent"].round(1).to_numpy(),
+                }).to_csv("stroop.csv", index=False)
+
+                print("Saved survey.csv, diary.csv, classroom.csv, essays.csv, stroop_trials.csv, stroop.csv")
                 """#,
                 r: #"""
-                # generate_data.R — creates survey.csv, diary.csv, classroom.csv, essays.csv
+                # generate_data.R — creates survey.csv, diary.csv, classroom.csv, essays.csv, stroop_trials.csv, stroop.csv
                 set.seed(2026)
 
                 to_scale  <- function(z, low = 1, high = 7) round(pmin(pmax((low + high) / 2 + z, low), high), 2)
@@ -611,21 +720,127 @@ extension Curriculum {
                                      rater_a_retest = score(0))     # rater A again, two weeks later
                 write.csv(essays, "essays.csv", row.names = FALSE)
 
-                cat("Saved survey.csv, diary.csv, classroom.csv, essays.csv\n")
+                # ---------- stroop_trials.csv and stroop.csv: a Stroop task ----------
+                n_s <- 60; n_items <- 24
+                person        <- rnorm(n_s, sd = 0.15)            # some people respond faster overall
+                person_effect <- rnorm(n_s, sd = 0.03)            # and show a bigger or smaller Stroop effect
+                item_effect   <- rnorm(n_items, sd = 0.05)        # some color words are harder
+                trials <- expand.grid(condition = c("congruent", "incongruent"), item = 1:n_items,
+                                      participant = 1:n_s, stringsAsFactors = FALSE)
+                trials <- trials[, c("participant", "item", "condition")]
+                log_rt <- 6.3 + person[trials$participant] + item_effect[trials$item] +
+                          (0.08 + person_effect[trials$participant]) * (trials$condition == "incongruent") +
+                          rnorm(nrow(trials), sd = 0.25)
+                trials$rt <- round(exp(log_rt))
+                write.csv(trials, "stroop_trials.csv", row.names = FALSE)
+
+                # One row per participant: mean RT in each condition, plus age and an attention check
+                means <- tapply(trials$rt, list(trials$participant, trials$condition), mean)
+                write.csv(data.frame(
+                  participant     = 1:n_s,
+                  age             = sample(16:40, n_s, replace = TRUE),     # a few are under 18
+                  attention_check = ifelse(runif(n_s) < 0.9, "pass", "fail"),
+                  rt_congruent    = round(means[, "congruent"], 1),
+                  rt_incongruent  = round(means[, "incongruent"], 1)
+                ), "stroop.csv", row.names = FALSE)
+
+                cat("Saved survey.csv, diary.csv, classroom.csv, essays.csv, stroop_trials.csv, stroop.csv\n")
                 """#
             )),
             .code(moreDataSample),
+            .code(extraDataSample),
+            .keyPoint("Practice simulations", "The fourth script creates two **practice simulations** — simulated studies whose data come with the same mess as real research: a study of political parasocial attachment (a survey with a credibility task, coded interviews, and a randomized intervention), and a study of how people ask chatbots about political court cases (session transcripts, exported chat logs, a speech-act coding sheet, double coding, a framework matrix, and repeated queries to five fictional chatbots). Exercises titled **Practice simulation** throughout the course use them."),
+            .code(simulationDataSample),
+            .code(CodeSample(
+                caption: "selfcheck — save once in the same folder; every exercise's Self-check uses it",
+                python: #"""
+                # selfcheck.py — compares your results with independently recomputed answers.
+                import numpy as np
+
+
+                def check(label, yours, expected, tol=0.01, hint=None):
+                    """Print ✓ if `yours` matches `expected` (within tol, relative to its size), else ✗."""
+                    try:
+                        a = np.squeeze(np.asarray(yours, dtype=float))
+                        b = np.squeeze(np.asarray(expected, dtype=float))
+                        close = np.abs(a - b) <= tol * (1 + np.abs(b))
+                        ok = a.shape == b.shape and bool(np.all(close | (np.isnan(a) & np.isnan(b))))
+                    except (TypeError, ValueError):
+                        # Text (or mixed) results must match exactly.
+                        ok = np.array_equal(np.asarray(yours, dtype=object), np.asarray(expected, dtype=object))
+                    print(("✓ " if ok else "✗ ") + label)
+                    if not ok:
+                        print(f"    yours:    {_show(yours)}")
+                        print(f"    expected: {_show(expected)}")
+                        if hint:
+                            print(f"    hint: {hint}")
+                    return ok
+
+
+                def _show(x):
+                    """Numbers as a compact, rounded list; anything else as is."""
+                    try:
+                        return np.round(np.asarray(x, dtype=float), 4).tolist()
+                    except (TypeError, ValueError):
+                        return x
+                """#,
+                r: #"""
+                # selfcheck.R — compares your results with independently recomputed answers.
+                # Load it with source("selfcheck.R").
+                check <- function(label, yours, expected, tol = 0.01, hint = NULL) {
+                  y <- unname(unlist(yours))
+                  e <- unname(unlist(expected))
+                  ok <- if (is.numeric(y) && is.numeric(e)) {
+                    length(y) == length(e) &&
+                      all((is.na(y) & is.na(e)) | abs(y - e) <= tol * (1 + abs(e)))
+                  } else {
+                    # Text (or mixed) results must match exactly.
+                    identical(as.character(y), as.character(e))
+                  }
+                  ok <- isTRUE(ok)
+                  cat(if (ok) "✓ " else "✗ ", label, "\n", sep = "")
+                  if (!ok) {
+                    cat("    yours:   ", format(y, digits = 4), "\n")
+                    cat("    expected:", format(e, digits = 4), "\n")
+                    if (!is.null(hint)) cat("    hint:", hint, "\n")
+                  }
+                  invisible(ok)
+                }
+                """#
+            )),
+            .keyPoint("Self-checks", "Most exercises have a **Self-check** button. It tells you which variable names to store your results in, and gives a short script to run underneath your code. The script recomputes each answer its own way and prints ✓ or ✗, so you can check your work without opening the solution. Save `selfcheck.py` / `selfcheck.R` above in your project folder first."),
             .terms([
                 Term("survey.csv", "375 respondents: `age`, `education` (1–5), `region` (urban / rural), 1–7 scale scores for `social_media`, `phone_checking`, `rumination`, `anxiety`, six 1–5 items `mind_1`–`mind_6` (3 and 5 reverse-worded), and a precomputed `mindfulness` score."),
                 Term("diary.csv", "100 people × 14 days: daily `work_hours` and `wellbeing` (1–7), plus each person's `conscientiousness` (1–5)."),
                 Term("classroom.csv", "150 students randomized to a `method` (lecture, active, flipped), with `pretest` and `posttest` scores (0–100) and their `school` (4 schools)."),
                 Term("essays.csv", "120 essays scored 1–6 by `rater_a` and `rater_b`, plus `rater_a_retest` (the same rater, two weeks later)."),
+                Term("stroop.csv", "60 participants in a Stroop task, one row each: `age`, `attention_check` (pass / fail), and mean reaction times `rt_congruent` and `rt_incongruent` (ms)."),
+                Term("stroop_trials.csv", "The same task trial by trial: 60 participants × 24 color words (`item`) × 2 conditions, with each trial's `rt` in ms."),
                 Term("judgments.csv", "40 participants × 32 sentences in a 2 × 2 design (`structure`: simple / complex × `distance`: short / long): an acceptability `rating` (1–7) and whether a comprehension question was answered `correct` (0/1)."),
                 Term("commutes.csv", "120 people × 10 weeks: commute `mode` (car, bus, bike, walk) and `distance_km`."),
                 Term("habits.csv", "500 students: six 0/1 study strategies (`reread`, `notes`, `selftest`, `spaced`, `explain`, `peers`), `gpa`, and the hidden `true_class`."),
                 Term("profiles.csv", "400 people: four continuous scores (`wellbeing`, `stress`, `support`, `sleep`), `age`, `burnout`, and the hidden `true_profile`."),
+                Term("missing.csv", "500 people: `age`, `stress`, `sleep`, and `wellbeing` with about a quarter missing, plus the hidden `wellbeing_true`."),
+                Term("fillers.csv", "300 interviews: filler-word counts (`fillers`), interview length in `minutes`, `condition` (relaxed / evaluated), second-language speaker `l2` (0/1), and `age`."),
+                Term("poll.csv", "1,000 poll respondents in 50 towns (`town`) and two regions (`region`), with policy `support` (0/1), `trust` (0–10), `age`, and a survey `weight`."),
+                Term("tutoring.csv", "800 students: `prior_gpa`, `motivation`, `parent_degree`, whether they chose `tutoring`, their `exam` score, and a teacher's recommendation (`recommended`)."),
+                Term("growth.csv", "250 students × up to 5 waves: reading `score` by `wave`, with a randomized `group` (control / intervention)."),
+                Term("ppsr_survey.csv", "Parasocial simulation — 375 respondents: parasocial attachment (`parasocial`, `prism`), identity `fusion`, perceived `charisma`, `affective_polarization`, `institutional_trust`, ideology and interest, twelve 1–5 wisdom items `wis_1`–`wis_12` (2, 6, 7, and 11 reverse-worded) with their `wisdom` score, and `credibility_bias`; recruited from a `university` or `prolific` `stream`."),
+                Term("credibility_trials.csv", "The credibility task trial by trial: 375 participants × 12 descriptions, each `creditable` or `discrediting` (`valence`) and attributed to the `favoured` or `disliked` figure (`target`), with `credibility` and `confidence` ratings (1–5)."),
+                Term("ppsr_narratives.csv", "30 coded interviews: `group` (maintained / breakup), the `figure_position` in the narrative (subject, helper, opponent), and whether political `commitments_survived` the breakup (0/1)."),
+                Term("ppsr_experiment.csv", "137 participants randomized to a writing `arm` (wise, parasocial, observer): `pre_`/`post_` attachment (`prism`) and polarization (`ap`), `wisdom`, `stream`, `issue`, a `manipulation_check`, and `words` written."),
+                Term("llm_sessions.csv", "Chatbot simulation — one row per participant (32): `country`, `headline` (US-1–3, CA-1–3), `model` (fictional A–E), screener self-placement `p1_self_placement` (0 = left … 10 = right), who transcribed and coded the session, and the post-task rating form `a1_agree` … `a7_placement` (A3 and A7 keep written answers such as `dont_know` and `not_political`)."),
+                Term("llm_transcripts.csv", "One row per turn of each session: `line`, `time`, `turn_type` (INT, PAR, QRY, LLM, ACT), `turn_id` (e.g. `P012_C1_Q03`, with `b` for an edited or regenerated turn), the interview `question` (Q1–Q11), the verbatim `text` (fillers, pauses, ((reading)) … ((/reading))), and transcriber `notes`."),
+                Term("llm_chat_export.csv", "The exported chat logs: every message sent (`role` = user) and received (`role` = assistant), with a UTC `timestamp_utc`. QRY rows in the transcript should match these exactly."),
+                Term("llm_coding.csv", "The consensus coding sheet, laid out like the team's Excel template: one row per speech act (`speech_act_id` = query ID + `_a`, `_b`), with `participant`, `chat`, `turn_position` (the query's number within its chat), `llm`, the full `query_text` and the act's `speech_act_text`, then the coded columns — `clause_type`, `primary_act` (10 draft levels), `directness`, presupposition (`presup`, `trigger_type`, `presup_direction`, `leading_construction`), evaluation (`evaluative`, `polarity`, `target`), `partisan_terms`, stance (`stance_disclosure`, `disclosure_direction`), `relation` to the previous model turn — plus `confidence`, `coder`, and `notes`. Columns that don't apply are blank."),
+                Term("llm_coder_a.csv / llm_coder_b.csv", "Each coder's independent sheet for every transcript, before the consensus meeting — the data reliability is calculated on. A few queries are split into speech acts differently."),
+                Term("llm_card_labels.csv", "The interview's Q5 card label for each query (`query_id`, `card_label`): what the participant says they were asking for."),
+                Term("llm_instrument_coding.csv", "60 survey-style items of the kind used in bias research, coded with the same codebook."),
+                Term("llm_framework.csv", "The interview framework matrix: one row per participant, one 0/1 column per code (`code_1_1` … `code_6_2`; e.g. `code_4_3` = perceived lean with a cue)."),
+                Term("llm_indexing.csv", "Indexing agreement for the same 7 transcripts: one row per interview answer line and code (4.1–5.4), with each coder's 0/1."),
+                Term("llm_responses.csv", "7,200 coded responses: 288 queries (`headline` × `speech_act` × `register` × `variant`; headlines 7–8 are neutral `control`s) × 5 fictional models (A–E) × 5 `run`s, with `lean` from −3 (left) to +3 (right)."),
             ]),
-            .keyPoint("The built-in truths", "• **survey:** social media → rumination (weaker at high mindfulness) → anxiety.\n• **diary:** people who *usually* work longer report *higher* wellbeing (between-person), but on days someone works *more than usual*, their wellbeing is *lower* (within-person) — especially for conscientious people.\n• **classroom:** active learning raises post-test scores about 0.4 SD above lecture; flipped barely helps.\n• **essays:** the raters agree well, but B scores about 0.3 points higher.\n• **judgments:** complex and long sentences are rated lower, and the two together are worse than their sum (an interaction).\n• **commutes:** people tend to repeat last week's mode, biking grows over the weeks, and long distances discourage biking and walking.\n• **habits / profiles:** three hidden types in each."),
+            .keyPoint("The built-in truths", "• **survey:** social media → rumination (weaker at high mindfulness) → anxiety.\n• **diary:** people who *usually* work longer report *higher* wellbeing (between-person), but on days someone works *more than usual*, their wellbeing is *lower* (within-person) — especially for conscientious people.\n• **classroom:** active learning raises post-test scores about 0.4 SD above lecture; flipped barely helps.\n• **essays:** the raters agree well, but B scores about 0.3 points higher.\n• **judgments:** complex and long sentences are rated lower, and the two together are worse than their sum (an interaction).\n• **commutes:** people tend to repeat last week's mode, biking grows over the weeks, and long distances discourage biking and walking.\n• **habits / profiles:** three hidden types in each.\n• **missing:** stressed people skip the wellbeing question, so complete cases overstate wellbeing.\n• **fillers:** being evaluated raises the filler rate 1.4×, speaking a second language 1.6×; counts are overdispersed.\n• **poll:** rural towns are oversampled and support the policy less, so weighting raises support.\n• **tutoring:** the true effect is +5 points, but motivated students choose tutoring, so the naive gap is about twice that.\n• **growth:** reading grows about 5 points per wave, 2 points faster with the intervention.\n• **parasocial simulation:** attachment predicts credibility bias and polarization, partly through bias; wisdom weakens the attachment → bias link; the wise-reasoning arm lowers attachment about 0.3 SD.\n• **chatbot simulation:** conversations drift from information-seeking to evaluation; askers' requests presuppose their own side's framing; the two coders agree well (Krippendorff's α) except on directness, where “can you…” requests split them, and on the inductive interview code 4.6; three transcript rows were “fixed” instead of pasted; right-leaning participants more often saw a lean, and placed the chatbot further left; most models lean slightly left, more so with everyday phrasing; single runs are noisy."),
             .caution("Python and R give different numbers", "Each language has its own random-number generator, so the two scripts create *different* datasets with the same structure. Use the same language for generating and analyzing, or share the CSVs. Exact estimates will vary; directions and rough sizes should match the truths."),
             .exercise(Exercise(
                 title: "Inspect your data",
@@ -639,16 +854,43 @@ extension Curriculum {
                     survey = pd.read_csv("survey.csv")
                     diary = pd.read_csv("diary.csv")
                     print(survey.shape, diary.shape)
-                    print(survey["mindfulness"].isna().sum())
+                    n_missing = survey["mindfulness"].isna().sum()
+                    print(n_missing)
                     """#,
                     r: #"""
                     survey <- read.csv("survey.csv")
                     diary <- read.csv("diary.csv")
                     dim(survey); dim(diary)
-                    sum(is.na(survey$mindfulness))
+                    n_missing <- sum(is.na(survey$mindfulness))
+                    n_missing
                     """#
                 ),
-                answer: "survey.csv has 375 rows × 15 columns and diary.csv has 1,400 rows (100 × 14). Only a handful of respondents (usually under 5) lack a mindfulness score, because a score requires at least 5 of the 6 items."
+                answer: "survey.csv has 375 rows × 15 columns and diary.csv has 1,400 rows (100 × 14). Only a handful of respondents (usually under 5) lack a mindfulness score, because a score requires at least 5 of the 6 items.",
+                selfCheck: SelfCheck(
+                    names: "`survey`, `diary`, and `n_missing` (the number of missing mindfulness scores)",
+                    python: #"""
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        check("Rows in survey.csv", len(survey), 375, tol=0)
+                        check("Rows in diary.csv", len(diary), 100 * 14, tol=0)
+                        check("Missing mindfulness scores", n_missing,
+                              pd.read_csv("survey.csv")["mindfulness"].isna().sum(), tol=0)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      check("Rows in survey.csv", nrow(survey), 375, tol = 0)
+                      check("Rows in diary.csv", nrow(diary), 100 * 14, tol = 0)
+                      check("Missing mindfulness scores", n_missing,
+                            sum(is.na(read.csv("survey.csv")$mindfulness)), tol = 0)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -714,17 +956,51 @@ extension Curriculum {
                     b = model.params["rumination"]
                     lo, hi = model.conf_int().loc["rumination"]
                     p = model.pvalues["rumination"]
-                    print(f"b = {b:.2f}, 95% CI [{lo:.2f}, {hi:.2f}], p = {p:.3g}; R² = {model.rsquared:.2f}")
+                    r2 = model.rsquared
+                    print(f"b = {b:.2f}, 95% CI [{lo:.2f}, {hi:.2f}], p = {p:.3g}; R² = {r2:.2f}")
                     """#,
                     r: #"""
                     b  <- coef(model)["rumination"]
-                    ci <- confint(model)["rumination", ]
+                    lo <- confint(model)["rumination", 1]
+                    hi <- confint(model)["rumination", 2]
                     p  <- summary(model)$coefficients["rumination", "Pr(>|t|)"]
-                    sprintf("b = %.2f, 95%% CI [%.2f, %.2f], p = %.3g; R2 = %.2f",
-                            b, ci[1], ci[2], p, summary(model)$r.squared)
+                    r2 <- summary(model)$r.squared
+                    sprintf("b = %.2f, 95%% CI [%.2f, %.2f], p = %.3g; R2 = %.2f", b, lo, hi, p, r2)
                     """#
                 ),
-                answer: "Rumination has a clearly positive coefficient (roughly 0.4–0.5 scale points per point of rumination), a CI that excludes 0, and p < .001. R² is typically around .25–.35."
+                answer: "Rumination has a clearly positive coefficient (roughly 0.4–0.5 scale points per point of rumination), a CI that excludes 0, and p < .001. R² is typically around .25–.35.",
+                selfCheck: SelfCheck(
+                    names: "`b`, `lo` and `hi` (the 95% CI), `p`, and `r2`",
+                    python: #"""
+                    import pandas as pd
+                    import statsmodels.formula.api as smf
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = smf.ols("anxiety ~ rumination + age", data=pd.read_csv("survey.csv")).fit()
+                        ci = ref.conf_int().loc["rumination"]
+                        check("b for rumination", b, ref.params["rumination"], tol=0.001)
+                        check("95% CI, lower", lo, ci[0], tol=0.001)
+                        check("95% CI, upper", hi, ci[1], tol=0.001)
+                        check("p-value", p, ref.pvalues["rumination"], tol=1e-6)
+                        check("R²", r2, ref.rsquared, tol=0.001, hint="Use R², not adjusted R².")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- lm(anxiety ~ rumination + age, data = read.csv("survey.csv"))
+                      ci <- confint(ref)["rumination", ]
+                      check("b for rumination", b, coef(ref)[["rumination"]], tol = 0.001)
+                      check("95% CI, lower", lo, ci[[1]], tol = 0.001)
+                      check("95% CI, upper", hi, ci[[2]], tol = 0.001)
+                      check("p-value", p, summary(ref)$coefficients["rumination", 4], tol = 1e-6)
+                      check("R²", r2, summary(ref)$r.squared, tol = 0.001, hint = "Use R², not adjusted R².")
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [

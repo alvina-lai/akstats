@@ -18,6 +18,8 @@ enum Theme {
     static let caution = Color(hex: 0xF59E0B)         // amber
     static let correct = Color(hex: 0x34D399)         // light emerald
     static let incorrect = Color(hex: 0xF87171)       // soft red
+    /// Marks exercises and lessons that use the practice simulations.
+    static let simulation = Color(hex: 0x22D3EE)      // cyan
 
     static let cornerRadius: CGFloat = 14
     static let animation = Animation.smooth(duration: 0.3)

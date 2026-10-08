@@ -79,6 +79,21 @@ struct Exercise {
     var solution: CodeSample? = nil
     /// What the learner should see or conclude once they've done it.
     let answer: String
+    /// A script the learner runs under their own code. It recomputes the answer and
+    /// prints ✓ or ✗ for each result, using the `selfcheck` helper from *Practice datasets*.
+    var selfCheck: SelfCheck? = nil
+}
+
+/// A runnable check for an exercise: which variables to create, and the script that checks them.
+struct SelfCheck {
+    /// The variable names the check expects, e.g. "`counts` and `means`".
+    let names: String
+    let python: String
+    let r: String
+
+    var sample: CodeSample {
+        CodeSample(caption: "Run this underneath your own code, in the same session", python: python, r: r)
+    }
 }
 
 /// A structured explanation of what a statistical model does and how it works.

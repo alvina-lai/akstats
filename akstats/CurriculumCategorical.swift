@@ -4,10 +4,10 @@ import Foundation
 
 extension Curriculum {
     static let categoricalOutcomes = Unit(
-        id: "categorical-outcomes", number: 9, title: "Categorical & ordinal outcomes", level: .advanced,
-        summary: "Ordinal mixed models for rating scales, and multinomial models for choices.",
+        id: "categorical-outcomes", number: 9, title: "Categorical, ordinal & count outcomes", level: .advanced,
+        summary: "Ordinal mixed models for rating scales, multinomial models for choices, and count models for rates.",
         symbol: "list.number",
-        lessons: [ordinalModels, multinomialOutcomes]
+        lessons: [ordinalModels, multinomialOutcomes, countModels]
     )
 
     static let latentModels = Unit(
@@ -19,9 +19,9 @@ extension Curriculum {
 
     static let textAsData = Unit(
         id: "text-as-data", number: 11, title: "Text as data", level: .advanced,
-        summary: "Embeddings, clustering, and distinctive words.",
+        summary: "Embeddings, clustering, distinctive words, dictionaries, and topic models.",
         symbol: "text.magnifyingglass",
-        lessons: [clustering, keyness]
+        lessons: [clustering, keyness, topicModels]
     )
 
     /// The second practice-data script (judgments, commutes, habits, profiles).
@@ -267,11 +267,18 @@ extension Curriculum {
                     python: #"""
                     import seaborn as sns
                     import matplotlib.pyplot as plt
+                    cell_means = judgments.groupby(["structure", "distance"])["rating"].mean()
+                    print(cell_means)
                     sns.pointplot(data=judgments, x="distance", y="rating", hue="structure",
                                   order=["short", "long"], palette=["#0072B2", "#D55E00"], errorbar=("ci", 95))
                     plt.ylabel("Mean rating (1–7)"); plt.show()
                     """#,
                     r: #"""
+                    cell_means <- judgments |>
+                      group_by(structure, distance) |>
+                      summarise(mean_rating = mean(as.numeric(rating)), .groups = "drop")
+                    cell_means
+
                     read_csv("judgments.csv") |>
                       mutate(distance = factor(distance, levels = c("short", "long"))) |>
                       ggplot(aes(distance, rating, colour = structure, group = structure)) +
@@ -281,7 +288,34 @@ extension Curriculum {
                       theme_classic()
                     """#
                 ),
-                answer: "The lines aren't parallel: long distance lowers ratings for both structures, but much more for complex sentences — the interaction."
+                answer: "The lines aren't parallel: long distance lowers ratings for both structures, but much more for complex sentences — the interaction.",
+                selfCheck: SelfCheck(
+                    names: "`cell_means` — the mean rating in each structure × distance cell (in R, a `mean_rating` column)",
+                    python: #"""
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("judgments.csv").groupby(["structure", "distance"])["rating"].mean()
+                        for s in ["simple", "complex"]:
+                            for d in ["short", "long"]:
+                                check(f"Mean rating, {s}-{d}", cell_means.loc[(s, d)], ref.loc[(s, d)])
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("judgments.csv")
+                      for (s in c("simple", "complex")) for (d in c("short", "long")) {
+                        yours <- with(cell_means, mean_rating[structure == s & distance == d])
+                        check(paste0("Mean rating, ", s, "-", d), yours,
+                              mean(ref$rating[ref$structure == s & ref$distance == d]))
+                      }
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Linear vs. ordinal",
@@ -290,14 +324,53 @@ extension Curriculum {
                     caption: "Solution",
                     python: #"""
                     import statsmodels.formula.api as smf
-                    print(smf.mixedlm("rating ~ complex * long", data=judgments, groups=judgments["participant"]).fit().params)
+                    lin = smf.mixedlm("rating ~ complex * long", data=judgments, groups=judgments["participant"]).fit()
+                    b_lin = lin.fe_params
+                    print(b_lin)
                     """#,
                     r: #"""
                     library(lmerTest)
-                    summary(lmer(as.numeric(rating) ~ complex * long + (1 | participant) + (1 | item), data = judgments))
+                    lin <- lmer(as.numeric(rating) ~ complex * long + (1 | participant) + (1 | item), data = judgments)
+                    b_lin <- fixef(lin)
+                    summary(lin)
                     """#
                 ),
-                answer: "The directions agree, but the linear model assumes equal spacing between categories and normal errors. With ratings bunched at the scale ends, its effect sizes and p-values can mislead — the ordinal model is the defensible choice."
+                answer: "The directions agree, but the linear model assumes equal spacing between categories and normal errors. With ratings bunched at the scale ends, its effect sizes and p-values can mislead — the ordinal model is the defensible choice.",
+                selfCheck: SelfCheck(
+                    names: "`b_lin` — the linear mixed model's fixed effects, named `complex`, `long`, and `complex:long`",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    import statsmodels.formula.api as smf
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("judgments.csv")
+                        ref["complex"] = np.where(ref["structure"] == "complex", 0.5, -0.5)
+                        ref["long"] = np.where(ref["distance"] == "long", 0.5, -0.5)
+                        fit = smf.mixedlm("rating ~ complex * long", data=ref, groups=ref["participant"]).fit()
+                        for term in ["complex", "long", "complex:long"]:
+                            check(f"Coefficient for {term}", b_lin[term], fit.fe_params[term], tol=0.001,
+                                  hint="Use the ±0.5 effect coding from the lesson.")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+                    library(lme4)
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- transform(read.csv("judgments.csv"),
+                                       complex = ifelse(structure == "complex", 0.5, -0.5),
+                                       long    = ifelse(distance == "long", 0.5, -0.5))
+                      fit <- lmer(rating ~ complex * long + (1 | participant) + (1 | item), data = ref)
+                      for (term in c("complex", "long", "complex:long")) {
+                        check(paste("Coefficient for", term), b_lin[[term]], fixef(fit)[[term]], tol = 0.001,
+                              hint = "Use the ±0.5 effect coding and both random intercepts.")
+                      }
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Predicted category probabilities",
@@ -306,14 +379,59 @@ extension Curriculum {
                     caption: "Solution",
                     python: #"""
                     new = pd.DataFrame({"complex": [-0.5, 0.5], "long": [-0.5, 0.5], "complex_x_long": [0.25, 0.25]})
-                    print(pd.DataFrame(fit.predict(new), columns=range(1, 8), index=["simple-short", "complex-long"]).round(3))
+                    probs = fit.predict(new)
+                    print(pd.DataFrame(probs, columns=range(1, 8), index=["simple-short", "complex-long"]).round(3))
                     """#,
                     r: #"""
                     m_fixed <- clm(rating ~ complex * long, data = judgments)
-                    predict(m_fixed, newdata = data.frame(complex = c(-0.5, 0.5), long = c(-0.5, 0.5)), type = "prob")
+                    probs <- predict(m_fixed, newdata = data.frame(complex = c(-0.5, 0.5), long = c(-0.5, 0.5)),
+                                     type = "prob")$fit
+                    round(probs, 3)
                     """#
                 ),
-                answer: "Simple-short sentences put most probability on 4–7; complex-long sentences shift it toward 1–3. Category probabilities are often the clearest way to report ordinal results."
+                answer: "Simple-short sentences put most probability on 4–7; complex-long sentences shift it toward 1–3. Category probabilities are often the clearest way to report ordinal results.",
+                selfCheck: SelfCheck(
+                    names: "`probs` — 2 rows (simple-short, then complex-long) × 7 columns (ratings 1–7)",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    from statsmodels.miscmodels.ordinal_model import OrderedModel
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("judgments.csv")
+                        cx = np.where(ref["structure"] == "complex", 0.5, -0.5)
+                        lg = np.where(ref["distance"] == "long", 0.5, -0.5)
+                        X = pd.DataFrame({"complex": cx, "long": lg, "complex_x_long": cx * lg})
+                        y = pd.Series(pd.Categorical(ref["rating"], categories=range(1, 8), ordered=True))
+                        fit = OrderedModel(y, X, distr="logit").fit(method="bfgs", disp=False)
+                        new = pd.DataFrame({"complex": [-0.5, 0.5], "long": [-0.5, 0.5], "complex_x_long": [0.25, 0.25]})
+                        expected = np.asarray(fit.predict(new))
+                        check("Each row sums to 1", np.asarray(probs).sum(axis=1), [1, 1], tol=1e-6)
+                        check("Probabilities, simple-short", np.asarray(probs)[0], expected[0], tol=0.001)
+                        check("Probabilities, complex-long", np.asarray(probs)[1], expected[1], tol=0.001,
+                              hint="The interaction term for complex-long is 0.5 × 0.5 = 0.25.")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+                    library(ordinal)
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- transform(read.csv("judgments.csv"),
+                                       rating  = factor(rating, levels = 1:7, ordered = TRUE),
+                                       complex = ifelse(structure == "complex", 0.5, -0.5),
+                                       long    = ifelse(distance == "long", 0.5, -0.5))
+                      fit <- clm(rating ~ complex * long, data = ref)
+                      expected <- predict(fit, newdata = data.frame(complex = c(-0.5, 0.5), long = c(-0.5, 0.5)),
+                                          type = "prob")$fit
+                      check("Each row sums to 1", rowSums(probs), c(1, 1), tol = 1e-6)
+                      check("Probabilities, simple-short", probs[1, ], expected[1, ], tol = 0.001)
+                      check("Probabilities, complex-long", probs[2, ], expected[2, ], tol = 0.001)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -437,19 +555,98 @@ extension Curriculum {
                     caption: "Solution",
                     python: #"""
                     tm = pd.crosstab(commutes["mode"], commutes["next_mode"], normalize="index")
-                    print(pd.Series({m: tm.loc[m, m] for m in tm.index}).round(2))
+                    stay = pd.Series({m: tm.loc[m, m] for m in tm.index})
+                    print(stay.round(2))
                     """#,
                     r: #"""
                     tm <- prop.table(table(transitions$mode, transitions$next_mode), margin = 1)
-                    round(diag(tm), 2)
+                    stay <- diag(tm)
+                    round(stay, 2)
                     """#
                 ),
-                answer: "Every mode's diagonal (roughly .65–.80) is far above its overall share — people repeat their choice most weeks. Bus, the most common mode, is usually the stickiest; walking the least."
+                answer: "Every mode's diagonal (roughly .65–.80) is far above its overall share — people repeat their choice most weeks. Bus, the most common mode, is usually the stickiest; walking the least.",
+                selfCheck: SelfCheck(
+                    names: "`stay` — the share who repeat each mode, named by mode (`bike`, `bus`, `car`, `walk`)",
+                    python: #"""
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("commutes.csv").sort_values(["participant", "week"])
+                        ref["next_mode"] = ref.groupby("participant")["mode"].shift(-1)
+                        ref = ref.dropna(subset=["next_mode"])          # week 10 has no "next week"
+                        for mode in ["bike", "bus", "car", "walk"]:
+                            rows = ref[ref["mode"] == mode]
+                            check(f"Share repeating {mode}", stay[mode], (rows["next_mode"] == mode).mean(),
+                                  hint="Sort by participant and week, and shift within each participant.")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("commutes.csv")
+                      ref <- ref[order(ref$participant, ref$week), ]
+                      ref$next_mode <- ave(ref$mode, ref$participant, FUN = function(m) c(m[-1], NA))
+                      ref <- ref[!is.na(ref$next_mode), ]               # week 10 has no "next week"
+                      for (mode in c("bike", "bus", "car", "walk")) {
+                        rows <- ref[ref$mode == mode, ]
+                        check(paste("Share repeating", mode), stay[[mode]], mean(rows$next_mode == mode),
+                              hint = "Sort by participant and week, and use lead() within each participant.")
+                      }
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Distance and the odds of walking",
                 prompt: "Interpret the `distance_km` coefficient for walk vs. car. Convert it to an odds ratio per extra kilometre.",
-                answer: "The coefficient is strongly negative (around −0.5 per km): each extra kilometre multiplies the odds of walking rather than driving by roughly 0.6. For bike vs. car the effect is negative but much smaller."
+                solution: CodeSample(
+                    caption: "Solution",
+                    python: #"""
+                    import numpy as np
+
+                    # mn.params has one column per non-reference mode: bus, bike, walk
+                    or_walk = np.exp(mn.params.loc["distance_km"].iloc[2])
+                    print(round(or_walk, 2))
+                    """#,
+                    r: #"""
+                    or_walk <- exp(coef(m)[["walk~distance_km"]])
+                    round(or_walk, 2)
+                    """#
+                ),
+                answer: "The coefficient is strongly negative (around −0.5 per km): each extra kilometre multiplies the odds of walking rather than driving by roughly 0.6. For bike vs. car the effect is negative but much smaller.",
+                selfCheck: SelfCheck(
+                    names: "`or_walk` — the odds ratio per extra kilometre, walk vs. car",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    import statsmodels.formula.api as smf
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        ref = pd.read_csv("commutes.csv")
+                        ref["mode_code"] = pd.Categorical(ref["mode"], categories=["car", "bus", "bike", "walk"]).codes
+                        fit = smf.mnlogit("mode_code ~ week + distance_km", data=ref).fit(disp=False)
+                        check("Odds ratio per km, walk vs. car", or_walk, np.exp(fit.params.loc["distance_km"].iloc[2]),
+                              tol=0.001, hint="Exponentiate the coefficient: odds ratio = exp(b).")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+                    library(mclogit)
+
+                    local({   # keeps these names from overwriting your variables
+                      ref <- read.csv("commutes.csv")
+                      ref$mode <- factor(ref$mode, levels = c("car", "bus", "bike", "walk"))
+                      fit <- mblogit(mode ~ week + distance_km, random = ~ 1 | participant, data = ref)
+                      check("Odds ratio per km, walk vs. car", or_walk, exp(coef(fit)[["walk~distance_km"]]),
+                            tol = 0.001, hint = "Exponentiate the coefficient: odds ratio = exp(b).")
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -517,8 +714,8 @@ extension Curriculum {
                 Term("Class size (π)", "Estimated share of the population in each class."),
                 Term("Item-response probability", "P(indicator = yes | class) — together these form the class's profile."),
                 Term("Posterior probability", "Each person's probability of belonging to each class, given their responses."),
-                Term("BIC", "Fit penalized for model complexity; lower is better. The most-used criterion for choosing the number of classes (Nylund et al., 2007)."),
-                Term("Entropy", "0–1: how cleanly people fall into classes. Above about .80 is good separation."),
+                Term("BIC", "Fit penalized for model complexity; lower is better. In simulations, BIC chose the number of classes best of the information criteria (Nylund, Asparouhov & Muthén, 2007)."),
+                Term("Entropy", "0–1: how cleanly people fall into classes. Above about .80 is commonly treated as good separation (Weller et al., 2020); don't use it to choose the number of classes."),
                 Term("Local independence", "Indicators are unrelated within a class."),
             ]),
             .code(CodeSample(
@@ -600,13 +797,52 @@ extension Curriculum {
                 solution: CodeSample(
                     caption: "Solution",
                     python: #"""
-                    print(pd.crosstab(habits["class"], habits["true_class"]))
+                    est = habits["class"]
+                    print(pd.crosstab(est, habits["true_class"]))
                     """#,
                     r: #"""
-                    table(estimated = best$predclass, true = habits$true_class)
+                    est <- best$predclass
+                    table(estimated = est, true = habits$true_class)
                     """#
                 ),
-                answer: "Each estimated class lines up mostly with one true class (possibly in a different order). Some students are misclassified because their particular answers happen to resemble another type."
+                answer: "Each estimated class lines up mostly with one true class (possibly in a different order). Some students are misclassified because their particular answers happen to resemble another type.",
+                selfCheck: SelfCheck(
+                    names: "`est` — each student's most likely class (1, 2, or 3), in the original row order",
+                    python: #"""
+                    from itertools import permutations
+                    import numpy as np
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        truth = pd.read_csv("habits.csv")["true_class"].to_numpy()
+                        est_arr = np.asarray(est).astype(int)
+                        check("One class per student", len(est_arr), len(truth), tol=0)
+                        check("Three classes, labelled 1–3", sorted(set(est_arr)), [1, 2, 3], tol=0)
+                        # Class numbers are arbitrary, so score the best matching of labels.
+                        agreement = max((np.array(p)[est_arr - 1] == truth).mean() for p in permutations([1, 2, 3]))
+                        print(f"Agreement with the true types: {agreement:.0%}")
+                        check("At least 70% classified correctly", agreement >= 0.70, True,
+                              hint="Fit 3 classes with several random starts (n_init) and keep the best.")
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      truth <- read.csv("habits.csv")$true_class
+                      check("One class per student", length(est), length(truth), tol = 0)
+                      check("Three classes, labelled 1–3", sort(unique(est)), 1:3, tol = 0)
+                      # Class numbers are arbitrary, so score the best matching of labels.
+                      perms <- list(c(1, 2, 3), c(1, 3, 2), c(2, 1, 3), c(2, 3, 1), c(3, 1, 2), c(3, 2, 1))
+                      agreement <- max(sapply(perms, function(p) mean(p[est] == truth)))
+                      cat(sprintf("Agreement with the true types: %.0f%%\n", 100 * agreement))
+                      check("At least 70% classified correctly", agreement >= 0.70, TRUE,
+                            hint = "Fit 3 classes with several random starts (nrep) and keep the best.")
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "The most typical member",
@@ -760,15 +996,54 @@ extension Curriculum {
                     python: #"""
                     from sklearn.metrics import adjusted_rand_score
                     truth = [0] * 4 + [1] * 4 + [2] * 4
-                    print(adjusted_rand_score(truth, labels))
+                    ari = adjusted_rand_score(truth, labels)
+                    print(ari)
                     """#,
                     r: #"""
                     library(mclust)
                     truth <- rep(1:3, each = 4)
-                    adjustedRandIndex(truth, km$cluster)
+                    ari <- adjustedRandIndex(truth, km$cluster)
+                    ari
                     """#
                 ),
-                answer: "ARI is high (often 1.0 for this tiny example). The groups are distinct in meaning, so embeddings separate them cleanly."
+                answer: "ARI is high (often 1.0 for this tiny example). The groups are distinct in meaning, so embeddings separate them cleanly.",
+                selfCheck: SelfCheck(
+                    names: "`ari`, plus your k = 3 cluster labels (`labels` in Python, `km` in R)",
+                    python: #"""
+                    import numpy as np
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        # The ARI from first principles: pair-counting agreement, corrected for chance.
+                        def comb2(x):
+                            return x * (x - 1) / 2
+
+                        truth = np.repeat([0, 1, 2], 4)
+                        table = np.array([[np.sum((truth == t) & (np.asarray(labels) == c)) for c in np.unique(labels)]
+                                          for t in range(3)])
+                        index = comb2(table).sum()
+                        rows, cols = comb2(table.sum(axis=1)).sum(), comb2(table.sum(axis=0)).sum()
+                        expected_index = rows * cols / comb2(len(truth))
+                        expected = (index - expected_index) / ((rows + cols) / 2 - expected_index)
+                        check("Adjusted Rand index", ari, expected, tol=0.001)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      # The ARI from first principles: pair-counting agreement, corrected for chance.
+                      comb2 <- function(x) x * (x - 1) / 2
+                      tab <- table(rep(1:3, each = 4), km$cluster)
+                      index <- sum(comb2(tab))
+                      rows <- sum(comb2(rowSums(tab))); cols <- sum(comb2(colSums(tab)))
+                      expected_index <- rows * cols / comb2(12)
+                      check("Adjusted Rand index", ari, (index - expected_index) / ((rows + cols) / 2 - expected_index),
+                            tol = 0.001)
+                    })
+                    """#
+                )
             )),
             .exercise(Exercise(
                 title: "Within vs. between similarity",
@@ -776,19 +1051,64 @@ extension Curriculum {
                 solution: CodeSample(
                     caption: "Solution",
                     python: #"""
+                    within_min = []
                     for g in range(3):
                         block = sim[4 * g:4 * g + 4, 4 * g:4 * g + 4]
-                        print(g, block[np.triu_indices(4, k=1)].min().round(2))
+                        within_min.append(block[np.triu_indices(4, k=1)].min())
+                    group = np.repeat([0, 1, 2], 4)
+                    between_max = sim[group[:, None] != group[None, :]].max()
+                    print(np.round(within_min, 2), round(between_max, 2))
                     """#,
                     r: #"""
                     sim <- emb %*% t(emb)   # dot product = cosine for normalized vectors
-                    sapply(0:2, function(g) {
+                    within_min <- sapply(0:2, function(g) {
                       block <- sim[(4 * g + 1):(4 * g + 4), (4 * g + 1):(4 * g + 4)]
                       min(block[upper.tri(block)])
                     })
+                    group <- rep(1:3, each = 4)
+                    between_max <- max(sim[outer(group, group, "!=")])
+                    round(c(within_min, between = between_max), 2)
                     """#
                 ),
-                answer: "Within-topic similarities are clearly higher than between-topic ones, with little or no overlap — which is exactly why clustering separates them so easily. When the ranges do overlap, expect some texts to land in the “wrong” cluster."
+                answer: "Within-topic similarities are clearly higher than between-topic ones, with little or no overlap — which is exactly why clustering separates them so easily. When the ranges do overlap, expect some texts to land in the “wrong” cluster.",
+                selfCheck: SelfCheck(
+                    names: "`within_min` (the lowest within-group similarity for each of the 3 groups) and `between_max`",
+                    python: #"""
+                    import numpy as np
+                    import pandas as pd
+                    from selfcheck import check
+
+                    def run_check():   # a function keeps these names from overwriting your variables
+                        e = pd.read_csv("embeddings.csv").to_numpy()
+                        e = e / np.linalg.norm(e, axis=1, keepdims=True)
+                        s = e @ e.T
+                        group = np.repeat([0, 1, 2], 4)
+                        pairs = np.triu(np.ones_like(s, dtype=bool), k=1)
+                        expected_within = [s[pairs & (group[:, None] == g) & (group[None, :] == g)].min() for g in range(3)]
+                        check("Lowest within-group similarity (cooking, weather, exercise)", within_min, expected_within,
+                              tol=0.001, hint="Exclude the diagonal — each text's similarity to itself is 1.")
+                        check("Highest between-group similarity", between_max,
+                              s[group[:, None] != group[None, :]].max(), tol=0.001)
+
+                    run_check()
+                    """#,
+                    r: #"""
+                    source("selfcheck.R")
+
+                    local({   # keeps these names from overwriting your variables
+                      e <- as.matrix(read.csv("embeddings.csv"))
+                      e <- e / sqrt(rowSums(e^2))
+                      s <- e %*% t(e)
+                      group <- rep(1:3, each = 4)
+                      pairs <- upper.tri(s)
+                      expected_within <- sapply(1:3, function(g) min(s[pairs & outer(group == g, group == g)]))
+                      check("Lowest within-group similarity (cooking, weather, exercise)", within_min, expected_within,
+                            tol = 0.001, hint = "Exclude the diagonal — each text's similarity to itself is 1.")
+                      check("Highest between-group similarity", between_max, max(s[outer(group, group, "!=")]),
+                            tol = 0.001)
+                    })
+                    """#
+                )
             )),
         ],
         quiz: [
@@ -829,7 +1149,7 @@ extension Curriculum {
                     "**Decisions made in advance** about tokenization, stop words, and the prior's strength.",
                     "Treat results as **exploratory** — candidates to test in a confirmatory design.",
                 ],
-                reading: "Monroe, Colaresi & Quinn (2008), *Political Analysis*, 16(4), 372–403; Silge & Robinson, *Text Mining with R* (tidylo)."
+                reading: "Monroe, Colaresi & Quinn (2008), *Political Analysis*, 16(4), 372–403; Schnoebelen, Silge & Hayes, *tidylo* R package documentation."
             )),
             .terms([
                 Term("Keyness", "How strongly a word is associated with one corpus relative to another."),

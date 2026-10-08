@@ -5,9 +5,9 @@ import Foundation
 extension Curriculum {
     static let comparing = Unit(
         id: "comparing", number: 4, title: "Comparing groups", level: .intermediate,
-        summary: "t-tests, ANOVA, ANCOVA, chi-square, rank-based tests, and a real-data lab.",
+        summary: "t-tests, ANOVA (including repeated measures), multiple comparisons, ANCOVA, chi-square, rank-based and equivalence tests, and a real-data lab.",
         symbol: "square.split.2x1",
-        lessons: [tTests, anova, ancova, chiSquare, nonParametric, hsb2Lab]
+        lessons: [tTests, anova, multipleComparisons, ancova, repeatedMeasures, chiSquare, nonParametric, equivalence, hsb2Lab]
     )
 
     static let tTests = Lesson(
@@ -48,33 +48,37 @@ extension Curriculum {
                 Term("Independent samples", "Two separate groups of people."),
                 Term("Paired samples", "The same people measured twice, or matched pairs."),
             ]),
-            .keyPoint("Default to Welch's t-test", "Welch's version doesn't assume equal variances in the two groups and loses almost nothing when they *are* equal. It's R's default; in SciPy you must ask for it with `equal_var=False`."),
+            .keyPoint("Default to Welch's t-test", "Welch's version doesn't assume equal variances in the two groups and loses almost nothing when they *are* equal (Delacre, Lakens & Leys, 2017). It's R's default; in SciPy you must ask for it with `equal_var=False`."),
             .code(CodeSample(
                 caption: "Independent and paired t-tests",
                 python: #"""
-                from scipy import stats
+                import pandas as pd
                 import pingouin as pg
+                from scipy import stats
 
-                # Independent groups (Welch)
-                stats.ttest_ind(treat, ctrl, equal_var=False)
+                # Independent groups: post-test scores, active learning vs. lecture (Welch)
+                classroom = pd.read_csv("classroom.csv")
+                treat = classroom.loc[classroom["method"] == "active", "posttest"]
+                ctrl = classroom.loc[classroom["method"] == "lecture", "posttest"]
+                print(stats.ttest_ind(treat, ctrl, equal_var=False))
 
                 # Paired: the same participants in both Stroop conditions
-                wide = long.pivot(index="participant", columns="condition", values="rt")
-                stats.ttest_rel(wide["incongruent"], wide["congruent"])
+                stroop = pd.read_csv("stroop.csv")
+                print(stats.ttest_rel(stroop["rt_incongruent"], stroop["rt_congruent"]))
 
                 # pingouin: t, df, p, 95% CI, Cohen's d, and power in one table
-                pg.ttest(treat, ctrl)
+                print(pg.ttest(treat, ctrl, correction=True))
                 """#,
                 r: #"""
-                # Independent groups (Welch is the default)
-                t.test(score ~ group, data = df)
+                library(tidyverse)
+
+                # Independent groups: post-test scores, active learning vs. lecture (Welch is the default)
+                classroom <- read_csv("classroom.csv")
+                t.test(posttest ~ method, data = filter(classroom, method %in% c("active", "lecture")))
 
                 # Paired: the same participants in both Stroop conditions
-                wide <- long |>
-                  select(participant, condition, rt) |>
-                  pivot_wider(names_from = condition, values_from = rt)
-
-                t.test(wide$incongruent, wide$congruent, paired = TRUE)
+                stroop <- read_csv("stroop.csv")
+                t.test(stroop$rt_incongruent, stroop$rt_congruent, paired = TRUE)
                 """#
             )),
             .caution("Match the test to the design", "Running an independent-samples t-test on repeated-measures data ignores that each person's two scores are correlated, which gives the wrong standard error. Paired designs are usually far more powerful."),
@@ -97,7 +101,7 @@ extension Curriculum {
         summary: "Three or more groups, factorial designs, and interactions.",
         minutes: 11,
         blocks: [
-            .text("ANOVA has been psychology's most-reported analysis for decades, and **mixed factorial designs** — some factors within-subjects, some between — are especially common. The *F* ratio compares variance *between* groups to variance *within* groups."),
+            .text("ANOVA has long been one of the most common analyses in experimental psychology, and **mixed factorial designs** — some factors within-subjects, some between — are especially common. The *F* ratio compares variance *between* groups to variance *within* groups."),
             .model(ModelExplainer(
                 name: "Analysis of variance (ANOVA)",
                 purpose: "Tests whether several group means are all equal by comparing how much the group means vary with how much individuals vary within groups.",
@@ -139,36 +143,45 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "One-way, post-hoc, and mixed ANOVA",
                 python: #"""
+                import pandas as pd
                 import pingouin as pg
 
-                # One-way: does wellbeing differ across employment statuses?
-                pg.anova(data=df, dv="wellbeing", between="employment", detailed=True)
+                classroom = pd.read_csv("classroom.csv")
+
+                # One-way: do post-test scores differ across teaching methods?
+                print(pg.anova(data=classroom, dv="posttest", between="method", detailed=True))
 
                 # Post-hoc pairwise comparisons, corrected
-                pg.pairwise_tukey(data=df, dv="wellbeing", between="employment")
+                print(pg.pairwise_tukey(data=classroom, dv="posttest", between="method"))
 
-                # 2-way factorial (between-subjects)
-                pg.anova(data=df, dv="wellbeing", between=["employment", "gender"])
+                # 2-way factorial (between-subjects): method × school
+                print(pg.anova(data=classroom, dv="posttest", between=["method", "school"]))
 
-                # Mixed: within-subject condition × between-subject group
-                pg.mixed_anova(data=long, dv="rt", within="condition",
-                               between="group", subject="participant")
+                # Mixed: within-subject time (pre/post) × between-subject method
+                long = classroom.melt(id_vars=["student", "method"], value_vars=["pretest", "posttest"],
+                                      var_name="time", value_name="score")
+                print(pg.mixed_anova(data=long, dv="score", within="time", between="method", subject="student"))
                 """#,
                 r: #"""
+                library(tidyverse)
                 library(afex)
                 library(emmeans)
 
-                # One-way (between-subjects)
-                fit <- aov_ez(id = "participant", dv = "wellbeing",
-                              between = "employment", data = df)
+                classroom <- read_csv("classroom.csv")
+
+                # One-way (between-subjects): do post-test scores differ across teaching methods?
+                fit <- aov_ez(id = "student", dv = "posttest", between = "method", data = classroom)
                 fit
 
                 # Post-hoc pairwise comparisons, corrected
-                pairs(emmeans(fit, ~ employment), adjust = "tukey")
+                pairs(emmeans(fit, ~ method), adjust = "tukey")
 
-                # Mixed: within-subject condition × between-subject group
-                aov_ez(id = "participant", dv = "rt", data = long,
-                       within = "condition", between = "group")
+                # 2-way factorial (between-subjects): method × school
+                aov_ez(id = "student", dv = "posttest", between = c("method", "school"), data = classroom)
+
+                # Mixed: within-subject time (pre/post) × between-subject method
+                long <- classroom |> pivot_longer(c(pretest, posttest), names_to = "time", values_to = "score")
+                aov_ez(id = "student", dv = "score", data = long, within = "time", between = "method")
                 """#
             )),
             .keyPoint("Interpret interactions first", "An interaction means the effect of one factor **depends on** the level of another. When it's present, main effects can be misleading on their own — plot the cell means before interpreting anything."),
@@ -229,19 +242,25 @@ extension Curriculum {
                 ]
             )),
             .code(CodeSample(
-                caption: "Chi-square test of independence with Cramér's V",
+                caption: "Chi-square test of independence with Cramér's V: is education level associated with region?",
                 python: #"""
+                import numpy as np
+                import pandas as pd
                 from scipy import stats
 
-                table = pd.crosstab(df["class_origin"], df["attended_university"])
+                survey = pd.read_csv("survey.csv")
+                table = pd.crosstab(survey["region"], survey["education"])   # 2 regions × 5 education levels
                 chi2, p, dof, expected = stats.chi2_contingency(table)
+                print(table, f"\nchi2({dof}) = {chi2:.2f}, p = {p:.3f}")
 
                 # Effect size: Cramér's V
                 n = table.to_numpy().sum()
                 v = np.sqrt(chi2 / (n * (min(table.shape) - 1)))
+                print("V =", round(v, 3))
                 """#,
                 r: #"""
-                tab <- table(df$class_origin, df$attended_university)
+                survey <- read.csv("survey.csv")
+                tab <- table(survey$region, survey$education)   # 2 regions × 5 education levels
                 chisq.test(tab)
 
                 # Effect size: Cramér's V
@@ -293,18 +312,28 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Rank-based tests",
                 python: #"""
-                stats.mannwhitneyu(treat, ctrl)
-                stats.wilcoxon(wide["incongruent"], wide["congruent"])
-                stats.kruskal(*[g["wellbeing"] for _, g in df.groupby("employment")])
+                import pandas as pd
+                from scipy import stats
+
+                classroom = pd.read_csv("classroom.csv")
+                active = classroom.loc[classroom["method"] == "active", "posttest"]
+                lecture = classroom.loc[classroom["method"] == "lecture", "posttest"]
+
+                print(stats.mannwhitneyu(active, lecture))                                   # two independent groups
+                print(stats.wilcoxon(classroom["posttest"], classroom["pretest"]))           # the same students twice
+                print(stats.kruskal(*[g["posttest"] for _, g in classroom.groupby("method")]))   # three or more groups
                 """#,
                 r: #"""
-                wilcox.test(score ~ group, data = df)
-                wilcox.test(wide$incongruent, wide$congruent, paired = TRUE)
-                kruskal.test(wellbeing ~ employment, data = df)
+                classroom <- read.csv("classroom.csv")
+                two_groups <- subset(classroom, method %in% c("active", "lecture"))
+
+                wilcox.test(posttest ~ method, data = two_groups)                     # two independent groups
+                wilcox.test(classroom$posttest, classroom$pretest, paired = TRUE)     # the same students twice
+                kruskal.test(posttest ~ method, data = classroom)                     # three or more groups
                 """#
             )),
             .keyPoint("When to use them", "Ordinal outcomes, such as a single Likert item, or small samples with heavy skew or extreme outliers."),
-            .caution("They test a different question", "Rank tests compare distributions and ranks, **not means**. Reviews show these tests are used less and less in psychology; alternatives include transforming the outcome, robust methods, and ordinal regression models."),
+            .caution("They test a different question", "Rank tests compare distributions and ranks, **not means**. Alternatives worth knowing include transforming the outcome, robust methods such as trimmed means (Wilcox, 2017), and ordinal regression models (Liddell & Kruschke, 2018)."),
         ],
         quiz: [
             Question(
@@ -322,9 +351,9 @@ extension Curriculum {
 extension Curriculum {
     static let relationships = Unit(
         id: "relationships", number: 5, title: "Relationships & regression", level: .intermediate,
-        summary: "Correlation (between and within people), linear and logistic regression, and two real-data labs.",
+        summary: "Correlation (between and within people), linear and logistic regression, diagnostics, and two real-data labs.",
         symbol: "chart.dots.scatter",
-        lessons: [correlation, betweenWithin, simpleRegression, multipleRegression, comparingPredictors, logisticRegression, evalsLab, resumeLab]
+        lessons: [correlation, betweenWithin, simpleRegression, multipleRegression, comparingPredictors, regressionDiagnostics, logisticRegression, evalsLab, resumeLab]
     )
 
     static let correlation = Lesson(
@@ -365,23 +394,33 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Pairwise correlations and a correlation matrix",
                 python: #"""
-                stats.pearsonr(df["screen_time"], df["anxiety"])
-                stats.spearmanr(df["screen_time"], df["anxiety"])
+                import pandas as pd
+                import pingouin as pg
+                from scipy import stats
 
-                pg.corr(df["screen_time"], df["anxiety"])   # r, 95% CI, p, power
+                survey = pd.read_csv("survey.csv")
 
-                df[["screen_time", "anxiety", "sleep"]].corr()
+                print(stats.pearsonr(survey["social_media"], survey["anxiety"]))
+                print(stats.spearmanr(survey["social_media"], survey["anxiety"]))
+
+                print(pg.corr(survey["social_media"], survey["anxiety"]))   # r, 95% CI, p, power
+
+                print(survey[["social_media", "anxiety", "rumination"]].corr())
                 """#,
                 r: #"""
-                cor.test(df$screen_time, df$anxiety)                       # Pearson
-                cor.test(df$screen_time, df$anxiety, method = "spearman")
+                library(tidyverse)
 
-                df |>
-                  select(screen_time, anxiety, sleep) |>
+                survey <- read_csv("survey.csv")
+
+                cor.test(survey$social_media, survey$anxiety)                        # Pearson
+                cor.test(survey$social_media, survey$anxiety, method = "spearman")
+
+                survey |>
+                  select(social_media, anxiety, rumination) |>
                   cor(use = "pairwise.complete.obs")
                 """#
             )),
-            .caution("Third variables", "Screen time and anxiety may both be driven by a third variable, like poor sleep or social isolation. A correlation alone can't tell you the direction of an effect, or whether there's an effect at all."),
+            .caution("Third variables", "Social media use and anxiety may both be driven by a third variable, like poor sleep or loneliness. A correlation alone can't tell you the direction of an effect, or whether there's an effect at all."),
             .keyPoint("Calibrating r", "Cohen's benchmarks are .10 / .30 / .50. But Funder & Ozer (2019) argue that in psychology an *r* of about .20 is a medium effect — and that small effects can add up over time and across people."),
             .field(.linguistics, "Word frequency correlates strongly with naming and lexical decision speed: more frequent words are recognized faster. The relationship is roughly linear on a **log** frequency scale."),
             .field(.sociology, "Neighborhood income correlates with generalized trust — but residential sorting and many confounds make causal interpretation hard."),
@@ -446,17 +485,20 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Fit, inspect, and diagnose a regression",
                 python: #"""
+                import pandas as pd
                 import statsmodels.formula.api as smf
 
-                model = smf.ols("wellbeing ~ income", data=df).fit()
+                survey = pd.read_csv("survey.csv")
+                model = smf.ols("anxiety ~ rumination", data=survey).fit()
                 print(model.summary())
 
-                model.params       # intercept and slope
-                model.conf_int()   # 95% CIs
-                model.rsquared
+                print(model.params)       # intercept and slope
+                print(model.conf_int())   # 95% CIs
+                print(model.rsquared)
                 """#,
                 r: #"""
-                model <- lm(wellbeing ~ income, data = df)
+                survey <- read.csv("survey.csv")
+                model <- lm(anxiety ~ rumination, data = survey)
                 summary(model)
                 confint(model)
 
@@ -524,32 +566,38 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Covariates, interactions, and model comparison",
                 python: #"""
+                import pandas as pd
+                import statsmodels.formula.api as smf
                 from statsmodels.stats.anova import anova_lm
 
+                survey = pd.read_csv("survey.csv")
+
                 # Centering makes the intercept and lower-order terms interpretable
-                df["age_c"] = df["age"] - df["age"].mean()
+                survey["age_c"] = survey["age"] - survey["age"].mean()
 
-                m1 = smf.ols("wellbeing ~ income + age_c + C(gender)", data=df).fit()
+                m1 = smf.ols("anxiety ~ rumination + age_c + C(region)", data=survey).fit()
 
-                # Does the income effect depend on age? (moderation)
-                m2 = smf.ols("wellbeing ~ income * age_c + C(gender)", data=df).fit()
+                # Does the rumination effect depend on age? (moderation)
+                m2 = smf.ols("anxiety ~ rumination * age_c + C(region)", data=survey).fit()
 
-                anova_lm(m1, m2)   # does the interaction improve fit?
+                print(anova_lm(m1, m2))   # does the interaction improve fit?
                 """#,
                 r: #"""
-                df <- df |> mutate(age_c = age - mean(age, na.rm = TRUE))
+                library(tidyverse)
 
-                m1 <- lm(wellbeing ~ income + age_c + gender, data = df)
+                survey <- read_csv("survey.csv") |> mutate(age_c = age - mean(age, na.rm = TRUE))
 
-                # Does the income effect depend on age? (moderation)
-                m2 <- lm(wellbeing ~ income * age_c + gender, data = df)
+                m1 <- lm(anxiety ~ rumination + age_c + region, data = survey)
+
+                # Does the rumination effect depend on age? (moderation)
+                m2 <- lm(anxiety ~ rumination * age_c + region, data = survey)
 
                 anova(m1, m2)   # does the interaction improve fit?
                 car::vif(m1)    # multicollinearity check
                 """#
             )),
-            .keyPoint("Dummy coding", "A categorical predictor with *k* levels becomes *k* − 1 indicator variables, each compared to a **reference level**. The coefficient for “gender[T.woman]” is the difference from the reference group."),
-            .caution("“Controlling for” isn't magic", "Adjusting for a variable that lies on the causal path (a mediator) or is caused by both predictor and outcome (a collider) can *create* bias. Also avoid stepwise selection: it capitalizes on chance, and it is declining in the literature."),
+            .keyPoint("Dummy coding", "A categorical predictor with *k* levels becomes *k* − 1 indicator variables, each compared to a **reference level**. The coefficient for “C(region)[T.urban]” is the difference between urban and the reference group (rural)."),
+            .caution("“Controlling for” isn't magic", "Adjusting for a variable that lies on the causal path (a mediator) or is caused by both predictor and outcome (a collider) can *create* bias. Also avoid stepwise selection: it capitalizes on chance, giving biased coefficients and overconfident p-values (Harrell, 2015, ch. 4)."),
             .field(.sociology, "Classic status-attainment models regress occupational prestige on parental occupation and education, asking how much of the family advantage is transmitted through schooling."),
         ],
         quiz: [
@@ -600,15 +648,28 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Fit a logistic model and convert to odds ratios",
                 python: #"""
-                m = smf.logit("voted ~ age_c + education + C(region)", data=df).fit()
+                import numpy as np
+                import pandas as pd
+                import statsmodels.formula.api as smf
+
+                survey = pd.read_csv("survey.csv")
+                survey["high_anxiety"] = (survey["anxiety"] >= 5).astype(int)   # 1 = anxiety of 5+ on the 1–7 scale
+                survey["age_c"] = survey["age"] - survey["age"].mean()
+
+                m = smf.logit("high_anxiety ~ rumination + age_c + C(region)", data=survey).fit()
                 print(m.summary())
 
-                np.exp(m.params)       # odds ratios
-                np.exp(m.conf_int())   # 95% CIs for odds ratios
+                print(np.exp(m.params))       # odds ratios
+                print(np.exp(m.conf_int()))   # 95% CIs for odds ratios
                 """#,
                 r: #"""
-                m <- glm(voted ~ age_c + education + region,
-                         data = df, family = binomial)
+                library(tidyverse)
+
+                survey <- read_csv("survey.csv") |>
+                  mutate(high_anxiety = as.integer(anxiety >= 5),    # 1 = anxiety of 5+ on the 1–7 scale
+                         age_c = age - mean(age))
+
+                m <- glm(high_anxiety ~ rumination + age_c + region, data = survey, family = binomial)
                 summary(m)
 
                 exp(coef(m))      # odds ratios
@@ -640,9 +701,9 @@ extension Curriculum {
 extension Curriculum {
     static let advanced = Unit(
         id: "advanced", number: 7, title: "Measurement & multilevel models", level: .advanced,
-        summary: "Mixed models for clustered data, scale scores, reliability, and transparent reporting.",
+        summary: "Mixed and growth models for clustered and longitudinal data, scale scores, reliability, CFA, and transparent reporting.",
         symbol: "point.3.connected.trianglepath.dotted",
-        lessons: [mixedModels, mixedLogistic, scaleScoring, reliability, interRater, reporting]
+        lessons: [mixedModels, mixedLogistic, growthModels, scaleScoring, reliability, cfa, interRater, reporting]
     )
 
     static let mixedModels = Lesson(
@@ -665,7 +726,7 @@ extension Curriculum {
                 ],
                 conditions: [
                     "**Linearity, normal residuals, and constant variance**, as in regression.",
-                    "**Random effects approximately normal**, and **enough clusters** (rough guide: 20+) to estimate their variance.",
+                    "**Random effects approximately normal**, and **enough clusters** to estimate their variance — simulations suggest roughly 30–50 for accurate standard errors, with small-sample corrections (e.g. Kenward–Roger) below that (Maas & Hox, 2005; McNeish & Stapleton, 2016).",
                     "**A random-effects structure justified by the design** — include random slopes for within-cluster predictors where the data support them, and report how convergence problems were handled.",
                 ],
                 reading: "Winter (2019), *Statistics for Linguists*, chs. 14–15; Baayen, Davidson & Bates (2008), *Journal of Memory and Language*, 59, 390–412; Brown (2021), *Advances in Methods and Practices in Psychological Science*, 4(1)."
@@ -691,32 +752,39 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Crossed random effects for participants and items",
                 python: #"""
+                import numpy as np
+                import pandas as pd
                 import statsmodels.formula.api as smf
 
+                trials = pd.read_csv("stroop_trials.csv")
+                trials["log_rt"] = np.log(trials["rt"])
+
                 # Random intercept + slope for participants
-                m = smf.mixedlm("log_rt ~ condition", data=long,
-                                groups=long["participant"],
+                m = smf.mixedlm("log_rt ~ condition", data=trials, groups=trials["participant"],
                                 re_formula="~condition").fit()
                 print(m.summary())
 
                 # Crossed participants + items via variance components
-                long["all"] = 1
-                m2 = smf.mixedlm("log_rt ~ condition", data=long, groups="all",
-                                 vc_formula={"participant": "0 + C(participant)",
-                                             "item": "0 + C(item)"}).fit()
+                trials["all"] = 1
+                m2 = smf.mixedlm("log_rt ~ condition", data=trials, groups="all",
+                                 vc_formula={"participant": "0 + C(participant)", "item": "0 + C(item)"}).fit()
+                print(m2.summary())
                 """#,
                 r: #"""
+                library(tidyverse)
                 library(lme4)
                 library(lmerTest)   # adds p-values (Satterthwaite df)
+
+                trials <- read_csv("stroop_trials.csv") |> mutate(log_rt = log(rt))
 
                 m <- lmer(log_rt ~ condition +
                             (1 + condition | participant) +
                             (1 | item),
-                          data = long)
+                          data = trials)
                 summary(m)
                 """#
             )),
-            .caution("Random-effects structure is debated", "Barr et al. (2013) say **keep it maximal** — include all random slopes justified by the design. Bates et al. (2015) argue for **parsimonious** models, since maximal models often fail to converge. Whatever you choose, report the full formula and how you handled convergence."),
+            .caution("Random-effects structure is debated", "Barr et al. (2013) say **keep it maximal** — include all random slopes justified by the design. Bates, Kliegl, et al. (2015) argue for **parsimonious** models, since maximal models often fail to converge. Whatever you choose, report the full formula and how you handled convergence."),
             .keyPoint("R leads here", "`lme4` is the field standard. Python's statsmodels handles crossed effects only awkwardly, so many Python users switch to R (or the `pymer4` bridge) for this step."),
             .field(.sociology, "Multilevel models put students within schools or residents within neighborhoods, separating individual-level effects from context-level effects."),
         ],
@@ -766,7 +834,7 @@ extension Curriculum {
                 reading: "Fabrigar, Wegener, MacCallum & Strahan (1999), *Psychological Methods*, 4(3), 272–299; Revelle, *psych* package documentation."
             )),
             .terms([
-                Term("Cronbach's α", "Internal consistency. ≥ .70 is often considered acceptable."),
+                Term("Cronbach's α", "Internal consistency. ≥ .70 is a common rule of thumb (traced to Nunnally, 1978), though the right threshold depends on how scores will be used."),
                 Term("McDonald's ω", "A reliability index with fewer assumptions than α; increasingly preferred."),
                 Term("EFA", "Exploratory factor analysis — discover the structure."),
                 Term("CFA", "Confirmatory factor analysis — test a hypothesized structure."),
@@ -775,27 +843,35 @@ extension Curriculum {
             .code(CodeSample(
                 caption: "Reliability and exploratory factor analysis",
                 python: #"""
+                # pip install factor_analyzer
+                import pandas as pd
                 import pingouin as pg
-                from factor_analyzer import FactorAnalyzer   # pip install factor_analyzer
+                from factor_analyzer import FactorAnalyzer
 
-                items = df[[f"anx_{i}" for i in range(1, 11)]]
+                survey = pd.read_csv("survey.csv")
+                items = survey[[f"mind_{i}" for i in range(1, 7)]].copy()
+                items[["mind_3", "mind_5"]] = 6 - items[["mind_3", "mind_5"]]     # reverse-key first
 
                 alpha, ci = pg.cronbach_alpha(data=items)
+                print("alpha:", round(alpha, 2), ci)
 
-                fa = FactorAnalyzer(n_factors=2, rotation="oblimin")
+                fa = FactorAnalyzer(n_factors=1, rotation=None)   # with several factors: n_factors=2, rotation="oblimin"
                 fa.fit(items.dropna())
-                loadings = pd.DataFrame(fa.loadings_, index=items.columns)
+                print(pd.DataFrame(fa.loadings_, index=items.columns, columns=["loading"]).round(2))
                 """#,
                 r: #"""
+                library(tidyverse)
                 library(psych)
 
-                items <- df |> select(starts_with("anx_"))
+                items <- read_csv("survey.csv") |>
+                  select(mind_1:mind_6) |>
+                  mutate(across(c(mind_3, mind_5), ~ 6 - .x))     # reverse-key first
 
-                psych::alpha(items)   # Cronbach's alpha
-                omega(items)          # McDonald's omega
+                psych::alpha(items)          # Cronbach's alpha
+                omega(items, nfactors = 1)   # McDonald's omega
 
-                fa.parallel(items)    # how many factors?
-                fa(items, nfactors = 2, rotate = "oblimin")
+                fa.parallel(items)           # how many factors?
+                fa(items, nfactors = 1)      # with several factors: nfactors = 2, rotate = "oblimin"
                 """#
             )),
             .caution("Reverse-score first", "Items worded in the opposite direction (“I feel calm”) must be recoded before computing α. On a 1–5 scale, the recoded value is 6 − *x*; on a 1–7 scale, 8 − *x*. Forgetting this is one of the most common errors in survey research."),
@@ -819,22 +895,29 @@ extension Curriculum {
         summary: "APA style, transparency, and avoiding the garden of forking paths.",
         minutes: 9,
         blocks: [
-            .text("Analysis isn't finished until it's reported clearly enough for someone else to evaluate and reproduce it. In APA 7th edition style, statistical symbols are italicized, exact *p*-values are reported (*p* = .032, or *p* < .001), and effect sizes come with confidence intervals."),
+            .text("Analysis isn't finished until it's reported clearly enough for someone else to evaluate and reproduce it. In APA style (American Psychological Association, 2020, 7th ed.), statistical symbols are italicized, exact *p*-values are reported (*p* = .032, or *p* < .001), and effect sizes come with confidence intervals."),
             .code(CodeSample(
                 caption: "Generate a report string directly from results",
                 python: #"""
-                res = pg.ttest(treat, ctrl).iloc[0]
+                import pandas as pd
+                import pingouin as pg
 
-                print(
-                    f"t({res['dof']:.1f}) = {res['T']:.2f}, "
-                    f"p = {res['p-val']:.3f}, d = {res['cohen-d']:.2f}"
-                )
+                classroom = pd.read_csv("classroom.csv")
+                treat = classroom.loc[classroom["method"] == "active", "posttest"]
+                ctrl = classroom.loc[classroom["method"] == "lecture", "posttest"]
+                res = pg.ttest(treat, ctrl, correction=True).iloc[0]          # Welch's t-test
+
+                # APA style: no leading zero on p, and "p < .001" for very small values
+                p_text = "< .001" if res["p-val"] < .001 else "= " + f"{res['p-val']:.3f}".lstrip("0")
+                print(f"t({res['dof']:.1f}) = {res['T']:.2f}, p {p_text}, d = {res['cohen-d']:.2f}")
                 """#,
                 r: #"""
                 library(report)   # part of easystats
 
-                t.test(score ~ group, data = df) |> report()
-                # "The Welch Two Sample t-test testing the difference of score by group ..."
+                classroom <- read.csv("classroom.csv")
+                two_groups <- subset(classroom, method %in% c("active", "lecture"))
+                t.test(posttest ~ method, data = two_groups) |> report()
+                # "The Welch Two Sample t-test testing the difference of posttest by method ..."
                 """#
             )),
             .keyPoint("Reporting checklist", "• Sample size and every exclusion, with reasons\n• Descriptives (*M*, *SD*) for each group\n• The test used and its assumption checks\n• Test statistic, df, and exact *p*\n• Effect size with 95% CI\n• Software and package versions"),
@@ -845,7 +928,7 @@ extension Curriculum {
                 Term("Open data & code", "Sharing materials so others can reproduce your analysis."),
             ]),
             .caution("The garden of forking paths", "Even without deliberate p-hacking, each data-dependent choice — which covariates, which exclusions, which outcome — multiplies the ways to find a “significant” result. Preregistration makes the planned path visible."),
-            .field(.linguistics, "Meteyard & Davies (2020) reviewed 400 papers and found that **reporting** is the principal point of failure for mixed models. Always state the full model formula, random-effects structure, and any simplification steps."),
+            .field(.linguistics, "Meteyard & Davies (2020) surveyed 163 researchers and reviewed 400 papers using mixed models, and found the most worrying inconsistency in how the models were **reported**. Always state the full model formula, random-effects structure, and any simplification steps."),
         ],
         quiz: [
             Question(

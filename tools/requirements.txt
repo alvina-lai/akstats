@@ -1,0 +1,5 @@
+# Versions the bundled practice data were generated with (other versions may change the random numbers)
+numpy==2.0.2
+pandas==2.3.3
+# Only for rebuilding practice_data.xlsx
+openpyxl==3.1.5

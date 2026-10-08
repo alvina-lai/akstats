@@ -162,48 +162,109 @@ struct ExerciseView: View {
     let exercise: Exercise
 
     @State private var showsHint = false
+    @State private var showsCheck = false
     @State private var showsSolution = false
+    @State private var openDataset: PracticeDataset?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Tag(text: "Practice", symbol: "square.and.pencil", color: Theme.accent)
-                Text(exercise.title)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if exercise.isPracticeSimulation {
+                    Tag(text: "Practice simulation", symbol: "flask", color: Theme.simulation)
+                } else {
+                    Tag(text: "Practice", symbol: "square.and.pencil", color: Theme.accent)
+                }
+                Text(exercise.displayTitle)
                     .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             markdown(exercise.prompt)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 8) {
-                if exercise.hint != nil {
-                    RevealButton(title: "Hint", symbol: "lightbulb", isOn: $showsHint)
-                }
-                RevealButton(title: "Solution", symbol: "checkmark.seal", isOn: $showsSolution)
+            if exercise.isPracticeSimulation, !exercise.datasets.isEmpty {
+                datasetLinks
+            }
+
+            // Stack the buttons vertically when all three don't fit on one line.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { revealButtons }
+                VStack(alignment: .leading, spacing: 8) { revealButtons }
             }
 
             if showsHint, let hint = exercise.hint {
                 CalloutView(title: "Hint", message: hint, symbol: "lightbulb", tint: Theme.caution)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.reveal)
+            }
+
+            if showsCheck, let check = exercise.selfCheck {
+                VStack(alignment: .leading, spacing: 12) {
+                    CalloutView(
+                        title: "Check your work",
+                        message: "Store your (unrounded) results as \(check.names), then paste this script underneath your code and run it in the same session. It recomputes each answer independently and prints **✓** or **✗** for each one. It needs `selfcheck.py` / `selfcheck.R` from the *Practice datasets* lesson in your project folder.",
+                        symbol: "checklist",
+                        tint: Theme.accent
+                    )
+                    CodeBlockView(sample: check.sample, startsExpanded: true)
+                }
+                .transition(.reveal)
             }
 
             if showsSolution {
                 VStack(alignment: .leading, spacing: 12) {
                     if let solution = exercise.solution {
-                        CodeBlockView(sample: solution)
+                        CodeBlockView(sample: solution, startsExpanded: true)
                     }
                     CalloutView(title: "What you should find", message: exercise.answer,
                                 symbol: "checkmark.seal", tint: Theme.correct)
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.reveal)
             }
         }
         .card()
         .overlay {
             RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                .strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
+                .strokeBorder((exercise.isPracticeSimulation ? Theme.simulation : Theme.accent).opacity(0.25), lineWidth: 1)
         }
+    }
+
+    /// Links to the CSV files the exercise uses: each opens a preview with a download button.
+    private var datasetLinks: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Data for this exercise")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            FlowLayout(spacing: 6) {
+                ForEach(exercise.datasets) { dataset in
+                    Button { openDataset = dataset } label: {
+                        Label(dataset.fileName, systemImage: "arrow.down.doc")
+                            .font(.system(.caption, design: .monospaced).weight(.medium))
+                            .foregroundStyle(Theme.simulation)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Theme.simulation.opacity(0.1), in: .capsule)
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                    .hoverHighlight(tint: Theme.simulation)
+                    .help("Preview and download \(dataset.fileName)")
+                }
+            }
+        }
+        .sheet(item: $openDataset) { dataset in
+            DatasetDetailView(dataset: dataset)
+                .tint(Theme.accent)
+        }
+    }
+
+    @ViewBuilder private var revealButtons: some View {
+        if exercise.hint != nil {
+            RevealButton(title: "Hint", symbol: "lightbulb", isOn: $showsHint)
+        }
+        if exercise.selfCheck != nil {
+            RevealButton(title: "Self-check", symbol: "checklist", isOn: $showsCheck)
+        }
+        RevealButton(title: "Solution", symbol: "checkmark.seal", isOn: $showsSolution)
     }
 }
 
@@ -329,7 +390,21 @@ struct CodeBlockView: View {
 
     @AppStorage("codeLanguage") private var language: CodeLanguage = .python
     @AppStorage("showsMplus") private var showsMplus = false
+    @Environment(\.lessonID) private var lessonID
     @State private var copied = false
+    @State private var isExpanded: Bool
+
+    /// Code is shown open unless the learner closed this block before; that choice is remembered.
+    /// (`startsExpanded` is kept for callers, but every block now starts open the first time.)
+    init(sample: CodeSample, startsExpanded: Bool? = nil) {
+        self.sample = sample
+        _isExpanded = State(initialValue: !CodeDisclosureMemory.isCollapsed(sample))
+    }
+
+    /// What the code is for, if the lesson provides a note for it.
+    private var explanation: String? {
+        Curriculum.codeExplanation(lessonID: lessonID, caption: sample.caption)
+    }
 
     private var displayed: CodeLanguage {
         showsMplus && sample.mplus != nil ? .mplus : language
@@ -353,59 +428,121 @@ struct CodeBlockView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(sample.caption)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            disclosureHeader
 
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    LanguageToggle(options: sample.languages, selection: selection)
-                    Spacer()
-                    Button(action: copy) {
-                        Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                            .font(.caption.weight(.medium))
-                            .contentTransition(.symbolEffect(.replace))
-                            .foregroundStyle(copied ? Theme.correct : .secondary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
+            // The note and the code open and close together
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let explanation {
+                        Label {
+                            markdown(explanation)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .lineSpacing(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } icon: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(displayed.color)
+                        }
+                        .padding(.horizontal, 12)
+                        .accessibilityLabel("What this code does: \(explanation)")
                     }
-                    .buttonStyle(PressableButtonStyle())
-                    .hoverHighlight(cornerRadius: 8)
+                    codePanel
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(displayed.color.opacity(0.10))
-
-                Rectangle()
-                    .fill(displayed.color.opacity(0.6))
-                    .frame(height: 1)
-
-                ScrollView(.horizontal) {
-                    Text(SyntaxHighlighter.highlight(source, commentMarker: displayed.commentMarker))
-                        .font(.system(.callout, design: .monospaced))
-                        .lineSpacing(3)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .padding(16)
-                        .id(displayed)
-                        .transition(.opacity.combined(with: .offset(y: 6)))
-                }
-                .scrollIndicators(.hidden)
+                .transition(.reveal)
             }
-            .background(Color(hex: 0x111827))
-            .overlay(alignment: .top) {
-                // A colored top edge identifies the language at a glance.
-                Rectangle()
-                    .fill(displayed.color)
-                    .frame(height: 3)
-            }
-            .clipShape(.rect(cornerRadius: Theme.cornerRadius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .strokeBorder(displayed.color.opacity(0.35), lineWidth: 1)
-            }
-            .animation(Theme.animation, value: displayed)
         }
+    }
+
+    /// The caption doubles as the control that shows and hides the code.
+    private var disclosureHeader: some View {
+        Button {
+            withAnimation(Theme.animation) { isExpanded.toggle() }
+            CodeDisclosureMemory.setCollapsed(!isExpanded, for: sample)
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(displayed.color)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                Text(sample.caption)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                if !isExpanded {
+                    Text("\(displayed.rawValue) · \(source.lineCount) lines")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(displayed.color)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(displayed.color.opacity(0.12), in: .capsule)
+                        .fixedSize()
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Theme.surface.opacity(isExpanded ? 0.3 : 0.7),
+                        in: .rect(cornerRadius: Theme.cornerRadius, style: .continuous))
+            .contentShape(.rect)
+        }
+        .buttonStyle(PressableButtonStyle())
+        .hoverHighlight(tint: displayed.color)
+        .accessibilityLabel(sample.caption)
+        .accessibilityValue(isExpanded ? "Code shown" : "Code hidden, \(source.lineCount) lines")
+        .accessibilityHint(isExpanded ? "Hides the code" : "Shows the code")
+    }
+
+    private var codePanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                LanguageToggle(options: sample.languages, selection: selection)
+                Spacer()
+                Button(action: copy) {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .font(.caption.weight(.medium))
+                        .contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(copied ? Theme.correct : .secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                }
+                .buttonStyle(PressableButtonStyle())
+                .hoverHighlight(cornerRadius: 8)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(displayed.color.opacity(0.10))
+
+            Rectangle()
+                .fill(displayed.color.opacity(0.6))
+                .frame(height: 1)
+
+            ScrollView(.horizontal) {
+                Text(SyntaxHighlighter.highlight(source, commentMarker: displayed.commentMarker))
+                    .font(.system(.callout, design: .monospaced))
+                    .lineSpacing(3)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(16)
+                    .id(displayed)
+                    .transition(.opacity.combined(with: .offset(y: 6)))
+            }
+            .scrollIndicators(.hidden)
+        }
+        .background(Color(hex: 0x111827))
+        .overlay(alignment: .top) {
+            // A colored top edge identifies the language at a glance.
+            Rectangle()
+                .fill(displayed.color)
+                .frame(height: 3)
+        }
+        .clipShape(.rect(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .strokeBorder(displayed.color.opacity(0.35), lineWidth: 1)
+        }
+        .animation(Theme.animation, value: displayed)
     }
 
     private func copy() {
@@ -420,6 +557,12 @@ struct CodeBlockView: View {
             try? await Task.sleep(for: .seconds(1.6))
             withAnimation(Theme.animation) { copied = false }
         }
+    }
+}
+
+private extension String {
+    var lineCount: Int {
+        split(separator: "\n", omittingEmptySubsequences: false).count
     }
 }
 
@@ -588,4 +731,135 @@ enum SyntaxHighlighter {
         flush()
         return result
     }
+}
+
+// MARK: - Reveal transition
+
+/// Unrolls content downward from its top edge and rolls it back up on removal, so anything
+/// a disclosure control shows appears to grow out of — and collapse back into — that control.
+/// (Sliding with `.move(edge: .top)` would instead offset long content by its whole height,
+/// so it flew in over the text above.)
+struct RevealTransition: Transition {
+    func body(content: Content, phase: TransitionPhase) -> some View {
+        content
+            .mask(alignment: .top) {
+                Rectangle()
+                    // Not exactly 0, which would make the mask's transform non-invertible.
+                    .scaleEffect(x: 1, y: phase.isIdentity ? 1 : 0.001, anchor: .top)
+            }
+            .opacity(phase.isIdentity ? 1 : 0)
+    }
+}
+
+extension Transition where Self == RevealTransition {
+    static var reveal: RevealTransition { RevealTransition() }
+}
+
+// MARK: - Remembering closed code blocks
+
+/// Which code blocks the learner has closed, saved across launches. Blocks are identified by their
+/// caption and code, so the same snippet shown in two places shares its state.
+enum CodeDisclosureMemory {
+    private static let key = "collapsedCodeBlocks"
+
+    static func id(for sample: CodeSample) -> String {
+        // FNV-1a: stable across launches, unlike Swift's randomized hashValue
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in (sample.caption + "\u{1}" + sample.python + "\u{1}" + sample.r).utf8 {
+            hash = (hash ^ UInt64(byte)) &* 0x100000001b3
+        }
+        return String(hash, radix: 36)
+    }
+
+    static func isCollapsed(_ sample: CodeSample) -> Bool {
+        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(id(for: sample))
+    }
+
+    static func setCollapsed(_ collapsed: Bool, for sample: CodeSample) {
+        var ids = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+        if collapsed { ids.insert(id(for: sample)) } else { ids.remove(id(for: sample)) }
+        UserDefaults.standard.set(ids.sorted(), forKey: key)
+    }
+}
+
+extension EnvironmentValues {
+    /// The lesson being shown, so nested views (like code blocks) can look up lesson-specific notes.
+    @Entry var lessonID: String? = nil
+}
+
+#Preview("Code block with its explanation") {
+    let lesson = Curriculum.lesson(id: "correlation")!
+    let sample = lesson.blocks.compactMap { block -> CodeSample? in
+        if case .code(let s) = block { return s } else { return nil }
+    }.first!
+    ScrollView {
+        CodeBlockView(sample: sample)
+            .padding(24)
+    }
+    .environment(\.lessonID, lesson.id)
+    .frame(width: 760, height: 560)
+    .background(Theme.background)
+    .preferredColorScheme(.dark)
+}
+
+// MARK: - Datasets an exercise uses
+
+extension Exercise {
+    /// Bundled practice datasets named in the prompt, solution, or self-check (e.g. `ppsr_survey.csv`), in order of first mention.
+    var datasets: [PracticeDataset] {
+        let text = [prompt, solution?.python ?? "", solution?.r ?? "", selfCheck?.python ?? "", selfCheck?.r ?? ""]
+            .joined(separator: "\n")
+        var seen: [String] = []
+        let pattern = /([a-z][a-z0-9_]*)\.csv/
+        for match in text.matches(of: pattern) {
+            let name = String(match.output.1)
+            if !seen.contains(name) { seen.append(name) }
+        }
+        return seen.compactMap { name in PracticeDataset.all.first { $0.name == name } }
+    }
+}
+
+/// Lays out children left to right, wrapping onto new lines as needed.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, widest: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > maxWidth {
+                y += rowHeight + spacing; x = 0; rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            widest = max(widest, x - spacing)
+        }
+        return CGSize(width: min(widest, maxWidth), height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX && x + size.width > bounds.maxX {
+                y += rowHeight + spacing; x = bounds.minX; rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+    }
+}
+
+#Preview("Practice simulation exercise") {
+    let exercise = Curriculum.lesson(id: "tidy-data")!.morePractice.first(where: \.isPracticeSimulation)!
+    ScrollView {
+        ExerciseView(exercise: exercise)
+            .padding(24)
+    }
+    .frame(width: 760, height: 460)
+    .background(Theme.background)
+    .tint(Theme.accent)
+    .preferredColorScheme(.dark)
 }
