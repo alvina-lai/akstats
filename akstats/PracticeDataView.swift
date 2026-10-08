@@ -79,7 +79,8 @@ struct CSVTable {
         self.rows = rows
     }
 
-    init(text: String) {
+    // Nonisolated so large files can be parsed off the main actor
+    nonisolated init(text: String) {
         var records: [[String]] = []
         var record: [String] = []
         var field = ""
